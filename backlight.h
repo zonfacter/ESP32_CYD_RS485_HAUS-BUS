@@ -10,10 +10,10 @@ void setupBacklight();
 // PWM-Steuerung für die Hintergrundbeleuchtung (0-100%)
 void setBacklight(int percent);
 
-#ifdef ESP32
+//#ifdef ESP32
 // PWM-Implementierung (nur für ESP32)
-void setBacklightPWM(int percent);
-#endif
+void setBacklightPWM(int value);  // Funktion deklarieren
+//#endif
 
 // Einfache digitale Implementierung (Ein/Aus)
 void setBacklightDigital(int percent);

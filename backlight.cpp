@@ -7,6 +7,7 @@
 
 // Aktuelle Hintergrundbeleuchtung
 int currentBacklight = DEFAULT_BACKLIGHT;
+int backlightValue = DEFAULT_BACKLIGHT;
 
 // Initialisiere die Hintergrundbeleuchtung mit direktem ESP-IDF API-Aufruf
 void setupBacklight() {
@@ -74,7 +75,14 @@ void setBacklight(int percent) {
   Serial.println(")");
 }
 
+
+
+void setBacklightPWM(int value) {
+  // Einfach die vorhandene setBacklight-Funktion nutzen
+  setBacklight(value);
+}
+
 // Sendet den aktuellen Status der Hintergrundbeleuchtung
 void sendBacklightStatus() {
-  sendTelegram("LBN", "1", "STATUS", String(currentBacklight));
+  sendTelegram("LBN", "16", "STATUS", String(currentBacklight));
 }

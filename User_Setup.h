@@ -1,9 +1,25 @@
-
-// Konfiguration für TZT ESP32 2.4" Display mit ST7789 Controller
-// Diese Datei muss im TFT_eSPI/User_Setup.h platziert werden
+/**
+ * User_Setup.h
+ * 
+ * Konfiguration für TZT ESP32 2.4" Display mit ST7789 Controller
+ * Diese Datei muss im TFT_eSPI/User_Setup.h platziert werden
+ * 
+ * Sie enthält Konfigurationseinstellungen für das Display, die Debug-
+ * Ausgaben und alle Hardware-spezifischen Definitionen.
+ */
 
 // User defined information reported by "Read_User_Setup" test & diagnostics example
 #define USER_SETUP_INFO "User_Setup for TZT ESP32 2.4 ST7789"
+
+// Debug-Einstellungen - Hier können verschiedene Debug-Ausgaben aktiviert/deaktiviert werden
+#define DB_TX_HEX 0      // Hex-Ausgabe für gesendete Telegramme (1=ein, 0=aus)
+#define DB_TX_INFO 0     // Allgemeine Informationen zum Senden (1=ein, 0=aus)
+#define DB_RX_HEX 0      // Hex-Ausgabe für empfangene Bytes (1=ein, 0=aus)
+#define DB_RX_INFO 0     // Allgemeine Informationen zum Empfang (1=ein, 0=aus)
+#define DB_INFO 0        // Allgemeine Debug-Informationen (1=ein, 0=aus)
+
+// RAW-Debug-Modus für eingehende Daten - zeigt alle empfangenen Bytes ohne Verarbeitung
+#define RAW_DEBUG 1      // RAW-Modus für eingehende Daten (1=ein, 0=aus)
 
 // Display-Treiber definieren
 #define ST7789_DRIVER

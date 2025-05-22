@@ -63,6 +63,7 @@ void getTouchPoint(int *x, int *y) {
   *y = constrain(*y, 0, SCREEN_HEIGHT - 1);
   
   // Protokollierung für Debugging-Zwecke
+  #if DB_INFO == 1  // Allgemeine Informationen
   Serial.print("Raw: (");
   Serial.print(p.x);
   Serial.print(", ");
@@ -72,6 +73,7 @@ void getTouchPoint(int *x, int *y) {
   Serial.print(", ");
   Serial.print(*y);
   Serial.println(")");
+  #endif
 }
 
 // Zeichnet ein Kalibrierungskreuz

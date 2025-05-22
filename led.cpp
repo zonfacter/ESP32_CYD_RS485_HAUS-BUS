@@ -1,4 +1,5 @@
 #include "led.h"
+#include "User_Setup.h"
 
 // Globale Variablen für den LED-Status
 unsigned long ledEndTime = 0;
@@ -38,8 +39,9 @@ void ledSendSignal() {
   // Timer setzen
   ledEndTime = millis() + LED_SEND_DURATION;
   currentLedState = 1;
-  
+  #if DB_TX_INFO == 1
   Serial.println("LED: Rot (Senden)");
+  #endif
 }
 
 // Schaltet die blaue LED ein (für den Empfang)
@@ -54,8 +56,9 @@ void ledReceiveSignal() {
   // Timer setzen
   ledEndTime = millis() + LED_RECEIVE_DURATION;
   currentLedState = 2;
-  
+  #if DB_RX_INFO == 1
   Serial.println("LED: Blau (Empfangen)");
+  #endif
 }
 
 // Aktualisiert den LED-Status basierend auf Timern

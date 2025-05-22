@@ -1,7 +1,11 @@
-/*  ESP32 ST7789 Touch-Menü
-    Für TZT ESP32 2.4" LCD mit ST7789 Controller und XPT2046 Touchscreen
-    Enthält ein 6-Tasten-Menü, PWM-gesteuerte Hintergrundbeleuchtung und
-    regelmäßige Statusmeldungen.
+/*  ESP32 ST7789 Touch-Menü mit CSMA/CD
+    Version 2.4 - Mai 2025
+    
+    Neue Features:
+    - CSMA/CD (Carrier Sense Multiple Access/Collision Detection)
+    - Sendepuffer mit Prioritäten
+    - Automatische Wiederholung bei Kollisionen
+    - Backoff-Algorithmus
 */
 
 #include "config.h"
@@ -10,20 +14,31 @@
 #include "menu.h"
 #include "communication.h"
 #include "backlight.h"
-#include "led.h"  // Neue Datei für LED-Steuerung einbinden
+#include "led.h"
 
 // Timing für Hintergrundbeleuchtungs-Status
 unsigned long lastBacklightStatusTime = 0;
 
+// Neue Funktionen aus communication.cpp
+extern void updateCommunication();
+extern void printCommunicationStats();
+
 void setup() {
   Serial.begin(115200);
-  Serial.println("ESP32 ST7789 Touch-Menü");
+  delay(100);
+  
+  #if DB_INFO == 1
+    Serial.println("\nESP32 ST7789 Touch-Menü mit CSMA/CD - Start");
+    Serial.println("Firmware-Version: 2.4");
+    Serial.println("Datum: Mai 2025");
+    Serial.println("Hardware: Separate UART2 RS485 mit CSMA/CD");
+  #endif
+  
+  // Kommunikation initialisieren (mit CSMA/CD)
+  setupCommunication();
   
   // Initialisiere die RGB-LED
   setupLed();
-  
-  // Initialisiere Kommunikation (UART und USB)
-  setupCommunication();
   
   // Initialisiere Hintergrundbeleuchtung
   setupBacklight();
@@ -31,6 +46,9 @@ void setup() {
   
   // Initialisiere den Touchscreen
   setupTouch();
+
+  // Initialisiere die Button-IDs
+  initializeButtons();
   
   // Initialisiere das Display
   setupDisplay();
@@ -38,9 +56,9 @@ void setup() {
   // Anzeige einiger Infos
   tft.fillScreen(TFT_WHITE);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  tft.drawCentreString("ESP32 ST7789 mit XPT2046", SCREEN_WIDTH/2, 20, 2);
+  tft.drawCentreString("ESP32 ST7789 mit CSMA/CD", SCREEN_WIDTH/2, 20, 2);
   tft.drawCentreString("Initialisierung...", SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 2);
-  tft.drawCentreString("Version 2.0", SCREEN_WIDTH/2, SCREEN_HEIGHT - 30, 1);
+  tft.drawCentreString("Version 2.4", SCREEN_WIDTH/2, SCREEN_HEIGHT - 30, 1);
   
   // Erste Statusmeldung der Hintergrundbeleuchtung
   sendBacklightStatus();
@@ -52,9 +70,23 @@ void setup() {
   showMenu();
 }
 
+void initializeButtons() {
+  // Die IDs müssen auf 17, 18, 19, 20, 21, 22 gesetzt werden
+  for (int i = 0; i < NUM_BUTTONS; i++) {
+    buttons[i].instanceID = String(17 + i);
+    
+    #if DB_INFO == 1
+      Serial.println("Button " + String(i+1) + " mit instanceID=" + buttons[i].instanceID + " initialisiert");
+    #endif
+  }
+}
+
 void loop() {
   // LED-Status aktualisieren
   updateLedStatus();
+  
+  // *** NEU: Kommunikation mit CSMA/CD verwalten ***
+  updateCommunication();
   
   // Prüfen, ob ein Statusupdate für die Hintergrundbeleuchtung fällig ist
   unsigned long currentMillis = millis();
@@ -63,35 +95,34 @@ void loop() {
     lastBacklightStatusTime = currentMillis;
   }
   
-  // Überprüfe, ob Telegramme über UART empfangen wurden
-  processIncomingTelegrams();
-  
-  // Überprüfe Touchscreen-Berührungen
+  // Touch-Eingaben verarbeiten
   if (touchscreen.tirqTouched() && touchscreen.touched()) {
     delay(50); // Entprellung
     
-    // Im Menü-Modus
     int x, y;
     getTouchPoint(&x, &y);
     
     // Prüfen, ob der Test-Button gedrückt wurde
     if (x >= SCREEN_WIDTH - 60 && x <= SCREEN_WIDTH - 5 && y >= 5 && y <= 35) {
-      // Test-Button wurde gedrückt
-      Serial.println("Test-Button gedrückt");
+      #if DB_INFO == 1
+        Serial.println("DEBUG: Test-Button gedrückt");
+      #endif
       testTouch();
     } else {
       int buttonPressed = checkButtonPress(x, y);
       
       if (buttonPressed >= 0) {
-        // Button wurde gedrückt
-        Serial.print("Button gedrückt: ");
-        Serial.println(buttons[buttonPressed].label);
+        #if DB_INFO == 1
+          Serial.print("DEBUG: Button gedrückt: ");
+          Serial.println(buttons[buttonPressed].label);
+        #endif
         
         // Taster-Status auf gedrückt setzen
         buttons[buttonPressed].pressed = true;
         
-        // Sende Taster-gedrückt-Telegramm
-        sendTelegram("BTN", buttons[buttonPressed].instanceID, "STATUS", "1");
+        // *** GEÄNDERT: Sende mit hoher Priorität ***
+        // Taster-Nachrichten haben automatisch hohe Priorität (Priorität 1)
+        sendTelegram("BTN", String(17 + buttonPressed), "STATUS", "1");
         
         // Speichere den ursprünglichen Aktivierungszustand
         bool wasActive = buttons[buttonPressed].isActive;
@@ -102,6 +133,9 @@ void loop() {
         // Warte, bis der Touchscreen losgelassen wird
         while (touchscreen.touched()) {
           delay(10);
+          
+          // *** WICHTIG: Während des Wartens die Kommunikation weiter verwalten ***
+          updateCommunication();
         }
         
         // Button wieder normal zeichnen, ABER NUR wenn er vorher nicht aktiv war
@@ -109,7 +143,7 @@ void loop() {
           setButtonActive(buttonPressed, false);
         }
         
-        // Tester-Button erneut zeichnen (blau)
+        // Test-Button erneut zeichnen (blau)
         tft.fillRect(SCREEN_WIDTH - 60, 5, 55, 30, TFT_BLUE);
         tft.setTextColor(TFT_WHITE);
         tft.drawCentreString("TEST", SCREEN_WIDTH - 32, 15, 1);
@@ -117,9 +151,16 @@ void loop() {
         // Taster-Status auf losgelassen setzen
         buttons[buttonPressed].pressed = false;
         
-        // Sende Taster-losgelassen-Telegramm
-        sendTelegram("BTN", buttons[buttonPressed].instanceID, "STATUS", "0");
+        // *** GEÄNDERT: Sende Loslassen-Nachricht ***
+        sendTelegram("BTN", String(17 + buttonPressed), "STATUS", "0");
       }
     }
+  }
+  
+  // Statistiken alle 60 Sekunden ausgeben (optional)
+  static unsigned long lastStatsOutput = 0;
+  if (millis() - lastStatsOutput > 60000) {
+    printCommunicationStats();
+    lastStatsOutput = millis();
   }
 }
