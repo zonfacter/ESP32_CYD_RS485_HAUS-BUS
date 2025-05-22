@@ -12,6 +12,7 @@
 #include "backlight.h"
 #include "menu.h"
 #include "led.h"
+#include "service_manager.h"  // NEU: Include für ServiceManager
 
 // Separate UART2-Instanz für RS485
 HardwareSerial RS485Serial(2);
@@ -711,6 +712,33 @@ void processTelegram(String telegramStr) {
     } else if (action == "GET") {
       // Status zurücksenden
       sendBacklightStatus();
+    }
+  }
+  else if (function == "SYS") {
+    // System-Steuerung
+    if (action == "RESET") {
+      #if DB_RX_INFO == 1
+        Serial.println("DEBUG: SYSTEM RESET empfangen!");
+        Serial.println("DEBUG: ESP32 wird in 2 Sekunden neu gestartet...");
+        Serial.flush(); // Sicherstellen, dass alle Debug-Nachrichten gesendet werden
+      #endif
+      
+      // Kurze Verzögerung für Debug-Ausgabe und eventuell letzte Kommunikation
+      delay(2000);
+      
+      // ESP32 Neustart
+      ESP.restart();
+    } else if (action == "SERVICE" || action == "WIFI" || action == "WEBSERVER") {
+      // *** ERWEITERT: Service-Modus Steuerung per Telegramm ***
+      #if DB_RX_INFO == 1
+        Serial.print("DEBUG: SYS.");
+        Serial.print(action);
+        Serial.print(" Telegramm empfangen - Params: ");
+        Serial.println(params);
+      #endif
+      
+      // Service-Manager direkt verwenden (extern ist bereits deklariert)
+      serviceManager.handleServiceTelegram(action, params);
     }
   }
   else if (function == "LED") {
