@@ -162,45 +162,45 @@ void initButtons() {
     buttons[5].h = buttonHeight;
   #endif
   
-  // Button-Labels und Funktionen
+  // Button-Labels und Funktionen - KORRIGIERT: instanceID auf 17-22 gesetzt
   buttons[0].label = "Taster 1";
-  buttons[0].instanceID = "1";
-  buttons[0].color = BUTTON_COLOR_INACTIVE;  // Standardfarbe ist grau
+  buttons[0].instanceID = "17";  // Button 1 → BTN.17 (LED.49)
+  buttons[0].color = BUTTON_COLOR_INACTIVE;
   buttons[0].textColor = TFT_WHITE;
   buttons[0].pressed = false;
   buttons[0].isActive = false;
   
   buttons[1].label = "Taster 2";
-  buttons[1].instanceID = "2";
-  buttons[1].color = BUTTON_COLOR_INACTIVE;  // Standardfarbe ist grau
+  buttons[1].instanceID = "18";  // Button 2 → BTN.18 (LED.50)
+  buttons[1].color = BUTTON_COLOR_INACTIVE;
   buttons[1].textColor = TFT_WHITE;
   buttons[1].pressed = false;
   buttons[1].isActive = false;
   
   buttons[2].label = "Taster 3";
-  buttons[2].instanceID = "3";
-  buttons[2].color = BUTTON_COLOR_INACTIVE;  // Standardfarbe ist grau
+  buttons[2].instanceID = "19";  // Button 3 → BTN.19 (LED.51)
+  buttons[2].color = BUTTON_COLOR_INACTIVE;
   buttons[2].textColor = TFT_WHITE;
   buttons[2].pressed = false;
   buttons[2].isActive = false;
   
   buttons[3].label = "Taster 4";
-  buttons[3].instanceID = "4";
-  buttons[3].color = BUTTON_COLOR_INACTIVE;  // Standardfarbe ist grau
+  buttons[3].instanceID = "20";  // Button 4 → BTN.20 (LED.52)
+  buttons[3].color = BUTTON_COLOR_INACTIVE;
   buttons[3].textColor = TFT_WHITE;
   buttons[3].pressed = false;
   buttons[3].isActive = false;
   
   buttons[4].label = "Taster 5";
-  buttons[4].instanceID = "5";
-  buttons[4].color = BUTTON_COLOR_INACTIVE;  // Standardfarbe ist grau
+  buttons[4].instanceID = "21";  // Button 5 → BTN.21 (LED.53)
+  buttons[4].color = BUTTON_COLOR_INACTIVE;
   buttons[4].textColor = TFT_WHITE;
   buttons[4].pressed = false;
   buttons[4].isActive = false;
   
   buttons[5].label = "Taster 6";
-  buttons[5].instanceID = "6";
-  buttons[5].color = BUTTON_COLOR_INACTIVE;  // Standardfarbe ist grau
+  buttons[5].instanceID = "22";  // Button 6 → BTN.22 (LED.54)
+  buttons[5].color = BUTTON_COLOR_INACTIVE;
   buttons[5].textColor = TFT_WHITE;
   buttons[5].pressed = false;
   buttons[5].isActive = false;

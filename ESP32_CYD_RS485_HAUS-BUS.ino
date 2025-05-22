@@ -6,6 +6,7 @@
     - Sendepuffer mit Prioritäten
     - Automatische Wiederholung bei Kollisionen
     - Backoff-Algorithmus
+    - Korrigierte LED-Button-Zuordnung (LED 49-54 → Button 1-6)
 */
 
 #include "config.h"
@@ -32,6 +33,7 @@ void setup() {
     Serial.println("Firmware-Version: 2.4");
     Serial.println("Datum: Mai 2025");
     Serial.println("Hardware: Separate UART2 RS485 mit CSMA/CD");
+    Serial.println("LED-Button-Zuordnung: LED 49-54 → Button 1-6");
   #endif
   
   // Kommunikation initialisieren (mit CSMA/CD)
@@ -47,7 +49,7 @@ void setup() {
   // Initialisiere den Touchscreen
   setupTouch();
 
-  // Initialisiere die Button-IDs
+  // Initialisiere die Button-IDs (wird jetzt in menu.cpp korrekt gemacht)
   initializeButtons();
   
   // Initialisiere das Display
@@ -71,14 +73,24 @@ void setup() {
 }
 
 void initializeButtons() {
-  // Die IDs müssen auf 17, 18, 19, 20, 21, 22 gesetzt werden
-  for (int i = 0; i < NUM_BUTTONS; i++) {
-    buttons[i].instanceID = String(17 + i);
-    
-    #if DB_INFO == 1
-      Serial.println("Button " + String(i+1) + " mit instanceID=" + buttons[i].instanceID + " initialisiert");
-    #endif
-  }
+  // KORRIGIERT: Die IDs werden jetzt korrekt in menu.cpp/initButtons() gesetzt
+  // Button-Index 0-5 entspricht instanceID "17"-"22"
+  // LED-IDs 49-54 werden in communication.cpp auf Button-Index 0-5 gemappt
+  
+  #if DB_INFO == 1
+    Serial.println("\n=== Button-LED-Zuordnung ===");
+    for (int i = 0; i < NUM_BUTTONS; i++) {
+      Serial.print("Button ");
+      Serial.print(i + 1);
+      Serial.print(" (Index ");
+      Serial.print(i);
+      Serial.print(") → BTN.");
+      Serial.print(buttons[i].instanceID);
+      Serial.print(" ↔ LED.");
+      Serial.println(49 + i);
+    }
+    Serial.println("============================");
+  #endif
 }
 
 void loop() {
@@ -114,15 +126,18 @@ void loop() {
       if (buttonPressed >= 0) {
         #if DB_INFO == 1
           Serial.print("DEBUG: Button gedrückt: ");
-          Serial.println(buttons[buttonPressed].label);
+          Serial.print(buttons[buttonPressed].label);
+          Serial.print(" (ID: ");
+          Serial.print(buttons[buttonPressed].instanceID);
+          Serial.println(")");
         #endif
         
         // Taster-Status auf gedrückt setzen
         buttons[buttonPressed].pressed = true;
         
-        // *** GEÄNDERT: Sende mit hoher Priorität ***
-        // Taster-Nachrichten haben automatisch hohe Priorität (Priorität 1)
-        sendTelegram("BTN", String(17 + buttonPressed), "STATUS", "1");
+        // *** KORRIGIERT: Sende mit korrekter instanceID (17-22) ***
+        // sendTelegram nutzt die instanceID aus buttons[buttonPressed].instanceID
+        sendTelegram("BTN", buttons[buttonPressed].instanceID, "STATUS", "1");
         
         // Speichere den ursprünglichen Aktivierungszustand
         bool wasActive = buttons[buttonPressed].isActive;
@@ -151,8 +166,8 @@ void loop() {
         // Taster-Status auf losgelassen setzen
         buttons[buttonPressed].pressed = false;
         
-        // *** GEÄNDERT: Sende Loslassen-Nachricht ***
-        sendTelegram("BTN", String(17 + buttonPressed), "STATUS", "0");
+        // *** KORRIGIERT: Sende Loslassen-Nachricht mit korrekter instanceID ***
+        sendTelegram("BTN", buttons[buttonPressed].instanceID, "STATUS", "0");
       }
     }
   }

@@ -4,8 +4,8 @@
  * Konfiguration für TZT ESP32 2.4" Display mit ST7789 Controller
  * Diese Datei muss im TFT_eSPI/User_Setup.h platziert werden
  * 
- * Sie enthält Konfigurationseinstellungen für das Display, die Debug-
- * Ausgaben und alle Hardware-spezifischen Definitionen.
+ * WICHTIG: TFT_BL Pin-Kontrolle wurde deaktiviert, damit unser eigener 
+ * PWM-Code die Hintergrundbeleuchtung steuern kann!
  */
 
 // User defined information reported by "Read_User_Setup" test & diagnostics example
@@ -37,9 +37,11 @@
 // DMA für ESP32 nutzen (beschleunigt die Anzeige)
 #define ESP32_DMA
 
-// Hintergrundbeleuchtungs-Pin und Zustand
-#define TFT_BL   27            // LED Hintergrundbeleuchtungs-Pin
-#define TFT_BACKLIGHT_ON HIGH  // Pegel zum Einschalten der Hintergrundbeleuchtung (HIGH oder LOW)
+// *** WICHTIG: BACKLIGHT-KONTROLLE DEAKTIVIERT ***
+// TFT_BL Pin wird NICHT definiert, damit TFT_eSPI ihn nicht steuert!
+// Unser eigener PWM-Code in backlight.cpp übernimmt die Kontrolle
+// #define TFT_BL   27            // ← AUSKOMMENTIERT!
+// #define TFT_BACKLIGHT_ON HIGH  // ← AUSKOMMENTIERT!
 
 // SPI-Pins für TZT ESP32 mit ST7789 Display
 #define TFT_MISO 12

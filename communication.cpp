@@ -614,7 +614,7 @@ void dumpRawData() {
 }
 
 /**
- * Telegramm-Verarbeitung
+ * Telegramm-Verarbeitung - KORRIGIERT für LED-IDs 49-54
  */
 void processTelegram(String telegramStr) {
   // Überprüfen, ob das Telegramm das richtige Format hat
@@ -714,36 +714,66 @@ void processTelegram(String telegramStr) {
     }
   }
   else if (function == "LED") {
-    // LED-Steuerung
+    // LED-Steuerung - KORRIGIERT: LED-IDs 49-54 auf Button-Indizes 0-5 mappen
     int ledId = instanceId.toInt();
-    if (ledId >= 17 && ledId <= 22) {
-      int buttonIndex = ledId - 17;
+    if (ledId >= 49 && ledId <= 54) {  // LED-IDs 49-54
+      int buttonIndex = ledId - 49;    // Button-Index 0-5 (Button 1-6)
+      
       if (buttonIndex >= 0 && buttonIndex < NUM_BUTTONS) {
         if (action == "ON") {
           int brightness = params.toInt();
           brightness = constrain(brightness, 0, 100);
-          uint8_t level = map(brightness, 0, 100, 0, 255);
-          uint16_t whiteColor = tft.color565(level, level, level);
-          buttons[buttonIndex].color = whiteColor;
-          buttons[buttonIndex].isActive = false;
+          
+          if (brightness > 0) {
+            // Helligkeit > 0 → Weiß mit entsprechender Helligkeit
+            uint8_t level = map(brightness, 0, 100, 0, 255);
+            uint16_t whiteColor = tft.color565(level, level, level);
+            buttons[buttonIndex].color = whiteColor;
+            buttons[buttonIndex].isActive = true;  // Button als aktiv markieren
+            #if DB_RX_INFO == 1
+              Serial.print("DEBUG: LED ");
+              Serial.print(ledId);
+              Serial.print(" (Button ");
+              Serial.print(buttonIndex + 1);
+              Serial.print(") aktiviert - Weiß mit Helligkeit ");
+              Serial.print(brightness);
+              Serial.print("% (RGB: ");
+              Serial.print(level);
+              Serial.println(")");
+            #endif
+          } else {
+            // Helligkeit = 0 → Grau (deaktiviert)
+            buttons[buttonIndex].color = TFT_DARKGREY;
+            buttons[buttonIndex].isActive = false;  // Button als inaktiv markieren
+            #if DB_RX_INFO == 1
+              Serial.print("DEBUG: LED ");
+              Serial.print(ledId);
+              Serial.print(" (Button ");
+              Serial.print(buttonIndex + 1);
+              Serial.println(") deaktiviert - ON.0 = Grau");
+            #endif
+          }
           redrawButton(buttonIndex);
-          #if DB_RX_INFO == 1
-            Serial.print("DEBUG: Button ");
-            Serial.print(buttonIndex);
-            Serial.println(" auf Weiß gesetzt mit Helligkeit ");
-            Serial.println(brightness);
-          #endif
+          
         } else if (action == "OFF") {
           buttons[buttonIndex].color = TFT_DARKGREY;
-          buttons[buttonIndex].isActive = false;
+          buttons[buttonIndex].isActive = false;  // Button als inaktiv markieren
           redrawButton(buttonIndex);
           #if DB_RX_INFO == 1
-            Serial.print("DEBUG: Button ");
-            Serial.print(buttonIndex);
-            Serial.println(" deaktiviert (grau)");
+            Serial.print("DEBUG: LED ");
+            Serial.print(ledId);
+            Serial.print(" (Button ");
+            Serial.print(buttonIndex + 1);
+            Serial.println(") deaktiviert - OFF = Grau");
           #endif
         }
       }
+    } else {
+      #if DB_RX_INFO == 1
+        Serial.print("DEBUG: Ungültige LED-ID: ");
+        Serial.print(ledId);
+        Serial.println(" (erwartet: 49-54)");
+      #endif
     }
   }
   else if (function == "BTN") {
