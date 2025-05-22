@@ -625,7 +625,7 @@ void processTelegram(String telegramStr) {
     #endif
     return;
   }
-  
+
   if (telegramStr.charAt(0) != START_BYTE || 
       telegramStr.charAt(telegramStr.length() - 1) != END_BYTE) {
     #if DB_RX_INFO == 1
@@ -633,25 +633,25 @@ void processTelegram(String telegramStr) {
     #endif
     return;
   }
-  
+
   // LED-Signal für den Empfang aktivieren
   ledReceiveSignal();
-  
+
   // Entferne START_BYTE und END_BYTE für die weitere Verarbeitung
   String payload = telegramStr.substring(1, telegramStr.length() - 1);
-  
+
   #if DB_RX_INFO == 1
     Serial.print("DEBUG: Payload: ");
     Serial.println(payload);
   #endif
-  
+
   // Payload in Teile zerlegen (Format: DEVICE_ID.FUNCTION.INSTANCE_ID.ACTION.PARAMS)
   int firstDot = payload.indexOf('.');
   if (firstDot == -1) return;
-  
+
   String deviceId = payload.substring(0, firstDot);
   String remainder = payload.substring(firstDot + 1);
-  
+
   // Prüfen, ob es unser Gerät ist
   if (deviceId != DEVICE_ID) {
     #if DB_RX_INFO == 1
@@ -661,29 +661,29 @@ void processTelegram(String telegramStr) {
     #endif
     return;
   }
-  
+
   #if DB_RX_INFO == 1
     Serial.print("DEBUG: Telegramm für uns! Verarbeite: ");
     Serial.println(remainder);
   #endif
-  
+
   // Weitere Zerlegung
   int secondDot = remainder.indexOf('.');
   if (secondDot == -1) return;
-  
+
   String function = remainder.substring(0, secondDot);
   String rest = remainder.substring(secondDot + 1);
-  
+
   int thirdDot = rest.indexOf('.');
   if (thirdDot == -1) return;
-  
+
   String instanceId = rest.substring(0, thirdDot);
   String actionAndParams = rest.substring(thirdDot + 1);
-  
+
   int fourthDot = actionAndParams.indexOf('.');
   String action = (fourthDot == -1) ? actionAndParams : actionAndParams.substring(0, fourthDot);
   String params = (fourthDot == -1) ? "" : actionAndParams.substring(fourthDot + 1);
-  
+
   #if DB_RX_INFO == 1
     Serial.print("DEBUG: Function: ");
     Serial.println(function);
@@ -694,11 +694,11 @@ void processTelegram(String telegramStr) {
     Serial.print("DEBUG: Params: ");
     Serial.println(params);
   #endif
-  
+
   // Funktionen verarbeiten
-  if (function == "BLT") {
+  if (function == "LBN") {
     // Backlight-Steuerung
-    if (action == "SET") {
+    if (action == "SET_MBR") {
       int brightness = params.toInt();
       if (brightness >= 0 && brightness <= 100) {
         setBacklight(brightness);
@@ -720,18 +720,27 @@ void processTelegram(String telegramStr) {
       int buttonIndex = ledId - 17;
       if (buttonIndex >= 0 && buttonIndex < NUM_BUTTONS) {
         if (action == "ON") {
-          setButtonActive(buttonIndex, true);
+          int brightness = params.toInt();
+          brightness = constrain(brightness, 0, 100);
+          uint8_t level = map(brightness, 0, 100, 0, 255);
+          uint16_t whiteColor = tft.color565(level, level, level);
+          buttons[buttonIndex].color = whiteColor;
+          buttons[buttonIndex].isActive = false;
+          redrawButton(buttonIndex);
           #if DB_RX_INFO == 1
             Serial.print("DEBUG: Button ");
             Serial.print(buttonIndex);
-            Serial.println(" aktiviert");
+            Serial.println(" auf Weiß gesetzt mit Helligkeit ");
+            Serial.println(brightness);
           #endif
         } else if (action == "OFF") {
-          setButtonActive(buttonIndex, false);
+          buttons[buttonIndex].color = TFT_DARKGREY;
+          buttons[buttonIndex].isActive = false;
+          redrawButton(buttonIndex);
           #if DB_RX_INFO == 1
             Serial.print("DEBUG: Button ");
             Serial.print(buttonIndex);
-            Serial.println(" deaktiviert");
+            Serial.println(" deaktiviert (grau)");
           #endif
         }
       }
@@ -743,11 +752,12 @@ void processTelegram(String telegramStr) {
       Serial.println("DEBUG: Button-Status empfangen (ungewöhnlich)");
     #endif
   }
-  
+
   #if DB_RX_INFO == 1
     Serial.println("DEBUG: Telegramm-Verarbeitung abgeschlossen");
   #endif
 }
+
 
 /**
  * Hex-Ausgabe für Debugging

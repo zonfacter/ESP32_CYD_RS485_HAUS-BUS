@@ -20,7 +20,7 @@ void setupCommunication();
  * 
  * @param function     Funktionskategorie (z.B. "BTN", "LED", "BLT")
  * @param instanceID   ID der Instanz (z.B. "17", "18")
- * @param action       Aktionsbezeichnung (z.B. "STATUS", "SET")
+ * @param action       Aktionsbezeichnung (z.B. "STATUS", "SET_MBR")
  * @param params       Optionale Parameter (Standard: "")
  */
 void sendTelegram(String function, String instanceID, String action, String params = "");
