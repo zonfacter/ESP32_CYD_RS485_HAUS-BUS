@@ -2,15 +2,26 @@
 
 Dieses Projekt implementiert ein interaktives Touch-Menü für TZT ESP32 2.4" LCD mit ST7789 Controller und XPT2046 Touchscreen. Es bietet ein 6-Tasten-Interface, PWM-gesteuerte Hintergrundbeleuchtung, RGB-LED-Feedback und RS485-UART-Kommunikation für industrielle Anwendungen.
 
+## 🆕 Version 1.50 - Neue Features
+
+- **Service-Menü System** mit 20-Sekunden Touch-Aktivierung
+- **Device ID Editor** mit Touch-Numpad für 4-stellige ID-Konfiguration
+- **Orientierungs-Umschaltung** (Portrait ↔ Landscape) mit sofortiger Anwendung
+- **WiFi Access Point** für Service-Konfiguration und Web-Interface
+- **EEPROM-Konfigurationsspeicherung** für persistente Einstellungen
+- **CSMA/CD-Kommunikation** für kollisionsfreie RS485-Übertragung
+
 ## 📋 Inhaltsverzeichnis
 
 - [Hardware-Komponenten](#hardware-komponenten)
 - [Pin-Belegung](#pin-belegung)
 - [RS485-TTL-Umsetzer](#rs485-ttl-umsetzer)
+- [Service-Menü (NEU)](#service-menü-neu)
 - [Funktionen](#funktionen)
 - [Konfiguration](#konfiguration)
 - [Kommunikationsprotokoll](#kommunikationsprotokoll)
 - [Installation](#installation)
+- [Quick-Setup Guide](#quick-setup-guide)
 - [Testmodus](#testmodus)
 - [Debugging](#debugging)
 - [Troubleshooting](#troubleshooting)
@@ -87,49 +98,111 @@ ESP32 TZT Board          RS485-TTL-Umsetzer          RS485 Bus
 └─────────────────┘      └─────────────────────┘      └─────────────────┘
 ```
 
-### RS485-Umsetzer Konfiguration
+## 🛠 Service-Menü (NEU)
 
-| Pin | Funktion | Verbindung | Beschreibung |
-|-----|----------|------------|-------------|
-| **VCC** | Spannungsversorgung | ESP32 3.3V | Betriebsspannung |
-| **GND** | Ground | ESP32 GND | Masse |
-| **DI** | Driver Input | ESP32 GPIO22 (TX) | Sendedaten vom ESP32 |
-| **RO** | Receiver Output | ESP32 GPIO21 (RX) | Empfangsdaten zum ESP32 |
-| **DE** | Driver Enable | Nicht verbunden* | Sende-Freigabe |
-| **RE** | Receiver Enable | Nicht verbunden* | Empfangs-Freigabe |
-| **A/+** | Data Plus | RS485 Bus A/+ | Positive Datenleitung |
-| **B/-** | Data Minus | RS485 Bus B/- | Negative Datenleitung |
+### Aktivierung des Service-Modus
 
-> *Hinweis: DE und RE werden oft zusammen verbunden oder haben interne Pull-Ups für Auto-Direction-Control.
+#### **Methode 1: 20-Sekunden Touch**
+1. **Beliebige Stelle** auf dem Bildschirm 20 Sekunden lang berühren
+2. **Progress-Bar** zeigt den Fortschritt (0-100%)
+3. **Service-Menü** öffnet sich automatisch
 
-### RS485-Bus Verkabelung
+#### **Methode 2: Telegramm-Steuerung**
+```bash
+ý5999.SYS.1.SERVICE.1þ    # Service-Modus aktivieren
+ý5999.SYS.1.SERVICE.0þ    # Service-Modus deaktivieren
+```
+
+### Service-Menü Funktionen
 
 ```
-Gerät 1              Gerät 2              Gerät 3              Abschlusswiderstand
-┌─────────┐         ┌─────────┐         ┌─────────┐         
-│ A/+ ────┼─────────┼ A/+ ────┼─────────┼ A/+     │         120Ω zwischen A und B
-│         │         │         │         │         │         an beiden Enden der
-│ B/- ────┼─────────┼ B/-─────┼─────────┼ B/-     │         Leitungen erforderlich
-│         │         │         │         │         │
-│ GND ────┼─────────┼ GND ────┼─────────┼ GND     │         Gemeinsame Masse
-└─────────┘         └─────────┘         └─────────┘         (optional, empfohlen)
+┌─────────────────────────────────────┐
+│            SERVICE MODUS            │
+├─────────────────────────────────────┤
+│ Device ID: 5999    Orient: LANDSCAPE│
+│                                     │
+│  [Device ID]      [→ Portrait]      │
+│                                     │
+│  [WiFi ON]        [Web Config]      │
+│                                     │
+│  [SAVE & EXIT]    [CANCEL]          │
+│                                     │
+└─────────────────────────────────────┘
 ```
+
+| Button | Funktion | Beschreibung |
+|--------|----------|-------------|
+| **Device ID** | ID-Editor | 4-stellige Geräte-ID mit Touch-Numpad ändern |
+| **→ Portrait/Landscape** | Orientierung | Sofortige Umschaltung Portrait ↔ Landscape |
+| **WiFi ON/OFF** | Access Point | WLAN-Hotspot für Web-Konfiguration |
+| **Web Config** | Browser-Interface | Öffnet Web-Interface (http://192.168.4.1) |
+| **SAVE & EXIT** | Speichern | Konfiguration in EEPROM speichern und verlassen |
+| **CANCEL** | Abbrechen | Verlassen ohne Speichern |
+
+### Device ID Editor
+
+```
+┌─────────────────────────────────────┐
+│          DEVICE ID EDITOR           │
+├─────────────────────────────────────┤
+│        Current: [5][9][9][9]        │
+│                  ↑ Position 1/4     │
+│                                     │
+│  [1] [2] [3]     [+]                │
+│  [4] [5] [6]     [-]                │
+│  [7] [8] [9]     [<] [>]            │
+│      [0]         [OK] [CANCEL]      │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+| Touch-Button | Funktion |
+|-------------|----------|
+| **0-9** | Ziffer setzen + automatisch weiter |
+| **+** | Aktuelle Ziffer +1 (0-9 Zyklus) |
+| **-** | Aktuelle Ziffer -1 (9-0 Zyklus) |
+| **< >** | Position links/rechts |
+| **OK** | Device ID übernehmen |
+| **CANCEL** | Abbrechen ohne Änderung |
+
+### WiFi Access Point
+
+**Aktivierung**: Service-Menü → "WiFi ON" oder `ý5999.SYS.1.WIFI.1þ`
+
+| Parameter | Wert |
+|-----------|------|
+| **SSID** | ESP32-ServiceMode |
+| **Passwort** | service123 |
+| **IP-Adresse** | 192.168.4.1 |
+| **Web-Interface** | http://192.168.4.1 |
 
 ## ⚡ Funktionen
 
-### Hauptfunktionen
+### Hauptfunktionen (Version 1.50)
 - **6-Tasten Touch-Interface** im 3x2 (Landscape) oder 2x3 (Portrait) Layout
 - **PWM-gesteuerte Hintergrundbeleuchtung** mit 256 Stufen (0-100%)
 - **RGB-LED Feedback** für visuelle Rückmeldung bei Kommunikation
-- **RS485-UART-Kommunikation** für industrielle Netzwerke
-- **Regelmäßige Statusmeldungen** alle 23 Sekunden
+- **CSMA/CD RS485-Kommunikation** für kollisionsfreie industrielle Netzwerke
+- **Service-Menü** mit Touch- und Telegramm-Aktivierung
+- **Device ID Konfiguration** über Touch-Numpad
+- **Orientierungs-Umschaltung** mit sofortiger Anwendung
+- **WiFi Access Point** für Web-basierte Konfiguration
+- **EEPROM-Speicherung** für persistente Einstellungen
 - **Touch-Kalibrierung** über integrierten Testmodus
+
+### CSMA/CD Features
+- **Carrier Sense**: Lauscht auf Bus vor dem Senden
+- **Collision Detection**: Erkennt Kollisionen durch Datenvergleich  
+- **Sendepuffer**: Prioritätsbasierte Warteschlange (10 Telegramme)
+- **Backoff-Algorithmus**: Exponentielles Warten bei Kollisionen
+- **Automatische Wiederholung**: Bis zu 5 Versuche pro Telegramm
+- **Statistiken**: Überwachung von Sendungen, Kollisionen, Retries
 
 ### Button-Funktionalität
 - **Visuelle Rückmeldung**: Buttons wechseln die Farbe bei Berührung
 - **Zustandsspeicherung**: Aktive Buttons bleiben grün markiert
 - **Protokoll-Integration**: Sendet BTN-Telegramme bei Berührung/Loslassen
-- **Eindeutige IDs**: Buttons haben IDs 17-22 für das Kommunikationsprotokoll
+- **LED-Zuordnung**: LED 49-54 steuern Button 1-6
 
 ## ⚙️ Konfiguration
 
@@ -139,7 +212,7 @@ Gerät 1              Gerät 2              Gerät 3              Abschlusswider
 // Display-Dimensionen und Ausrichtung
 #define PORTRAIT 0
 #define LANDSCAPE 1
-#define SCREEN_ORIENTATION LANDSCAPE  // Wechsel zu PORTRAIT für Hochformat
+#define SCREEN_ORIENTATION LANDSCAPE  // Kann über Service-Menü geändert werden
 
 // Hintergrundbeleuchtungs-Pin und Kanal
 #define TFT_BL_PIN 27
@@ -147,57 +220,24 @@ Gerät 1              Gerät 2              Gerät 3              Abschlusswider
 #define DEFAULT_BACKLIGHT 100  // Standardhelligkeit (0-100%)
 ```
 
-### RGB-LED Konfiguration (config.h)
+### Service-Manager Konfiguration (config.h)
 
 ```cpp
-// RGB-LED Pins (negierte Logik: LOW = Ein, HIGH = Aus)
-#define LED_RED_PIN 4      // Rote LED - Senden
-#define LED_GREEN_PIN 16   // Grüne LED - Bereit
-#define LED_BLUE_PIN 17    // Blaue LED - Empfangen
-
-// LED-Blinkzeiten
-#define LED_SEND_DURATION 100    // Dauer des roten Signals beim Senden (ms)
-#define LED_RECEIVE_DURATION 200 // Dauer des blauen Signals beim Empfangen (ms)
+// Service-Menü Parameter
+#define SERVICE_TOUCH_TIME 20000     // 20 Sekunden für Aktivierung
+#define SERVICE_EEPROM_ADDR 100      // EEPROM-Startadresse
+#define SERVICE_WIFI_SSID "ESP32-ServiceMode"
+#define SERVICE_WIFI_PASSWORD "service123"
 ```
 
-### UART-Kommunikation (config.h)
+### CSMA/CD Konfiguration (config.h)
 
 ```cpp
-// UART2 Pins für RS485-Kommunikation (Hardware umverdrahtet!)
-#define UART_RX_PIN 21  // RX Pin (normalerweise TX)
-#define UART_TX_PIN 22  // TX Pin (normalerweise RX)
-#define UART_EN_PIN -1  // Kein Enable Pin (Auto-Direction)
-
-// Kommunikationsprotokoll Konstanten
-#define START_BYTE 0xFD  // Startbyte (ý)
-#define END_BYTE 0xFE    // Endbyte (þ)
-#define DEVICE_ID "5999" // Eindeutige Geräte-ID
-```
-
-### Touch-Kalibrierung (config.h)
-
-```cpp
-// Touch-Parameter für Kalibrierung
-#define TOUCH_MIN_X 400
-#define TOUCH_MAX_X 3900
-#define TOUCH_MIN_Y 400
-#define TOUCH_MAX_Y 3900
-
-// Touch-Invertierung (kann im TEST-Modus angepasst werden)
-extern bool invertTouchX;  // Standardmäßig true
-extern bool invertTouchY;  // Standardmäßig true
-```
-
-### Debug-Einstellungen (config.h)
-
-```cpp
-// Debug-Ausgaben aktivieren/deaktivieren
-#define DB_TX_HEX 0      // Hex-Ausgabe für gesendete Telegramme
-#define DB_TX_INFO 0     // Allgemeine Informationen zum Senden
-#define DB_RX_HEX 1      // Hex-Ausgabe für empfangene Bytes
-#define DB_RX_INFO 1     // Allgemeine Informationen zum Empfang
-#define DB_INFO 0        // Allgemeine Debug-Informationen
-#define RAW_DEBUG 1      // RAW-Modus für eingehende Daten
+// CSMA/CD Parameter
+#define BUS_IDLE_TIME 10             // Zeit ohne Aktivität = Bus frei (ms)
+#define COLLISION_DETECT_TIME 5      // Zeit für Kollisionsprüfung (ms)
+#define SEND_QUEUE_SIZE 10           // Sendepuffer-Größe
+#define MAX_RETRIES_PER_TELEGRAM 5   // Maximale Wiederholungen
 ```
 
 ## 📡 Kommunikationsprotokoll
@@ -222,17 +262,25 @@ Alle Kommunikation erfolgt über strukturierte Telegramme:
 | **Stoppbits** | 1 | Anzahl Stoppbits |
 | **Format** | 8E1 | Zusammenfassung |
 
-### Verfügbare Befehle
+### Verfügbare Befehle (Version 1.50)
+
+#### System-Befehle (NEU)
+
+| Befehl | Beschreibung | Beispiel |
+|--------|-------------|----------|
+| `SYS.1.SERVICE.1/0` | Service-Modus ein/aus | `ý5999.SYS.1.SERVICE.1þ` |
+| `SYS.1.WIFI.1/0` | WiFi Access Point ein/aus | `ý5999.SYS.1.WIFI.1þ` |
+| `SYS.1.WEBSERVER.1/0` | Web-Server ein/aus | `ý5999.SYS.1.WEBSERVER.1þ` |
+| `SYS.1.RESET.0` | ESP32 Neustart | `ý5999.SYS.1.RESET.0þ` |
 
 #### Empfangene Befehle (ESP32 als Empfänger)
 
 | Befehl | Beschreibung | Beispiel | Antwort |
 |--------|-------------|----------|---------|
 | `LBN.16.SET_MBR.{0-100}` | Hintergrundbeleuchtung einstellen | `ý5999.LBN.16.SET_MBR.75þ` | Helligkeit → 75% |
-| `LED.{17-22}.ON.{param}` | Button aktivieren (grün) | `ý5999.LED.17.ON.100þ` | Button 1 → grün |
-| `LED.{17-22}.OFF.{param}` | Button deaktivieren (grau) | `ý5999.LED.18.OFF.0þ` | Button 2 → grau |
-| `LED.{17-22}.1.{param}` | Button aktivieren (alternativ) | `ý5999.LED.19.1.0þ` | Button 3 → grün |
-| `LED.{17-22}.0.{param}` | Button deaktivieren (alternativ) | `ý5999.LED.20.0.0þ` | Button 4 → grau |
+| `LED.{49-54}.ON.{0-100}` | Button aktivieren mit Helligkeit | `ý5999.LED.49.ON.100þ` | Button 1 → weiß hell |
+| `LED.{49-54}.ON.0` | Button deaktivieren | `ý5999.LED.49.ON.0þ` | Button 1 → grau |
+| `LED.{49-54}.OFF.0` | Button deaktivieren (alternativ) | `ý5999.LED.50.OFF.0þ` | Button 2 → grau |
 
 #### Gesendete Befehle (ESP32 als Sender)
 
@@ -242,23 +290,23 @@ Alle Kommunikation erfolgt über strukturierte Telegramme:
 | `BTN.{17-22}.STATUS.0` | Button losgelassen | Nach Touch-Ereignis | `ý5999.BTN.17.STATUS.0þ` |
 | `LBN.16.STATUS.{0-100}` | Helligkeitsstatus | Alle 23 Sekunden | `ý5999.LBN.16.STATUS.100þ` |
 
-### Button-ID-Zuordnung
+### Button-LED-Zuordnung (Korrigiert)
 
-| Button-Position | Instanz-ID | Landscape Layout | Portrait Layout |
-|----------------|------------|------------------|-----------------|
-| Button 1 | 17 | Oben Links | Oben Links |
-| Button 2 | 18 | Oben Mitte | Oben Rechts |
-| Button 3 | 19 | Oben Rechts | Mitte Links |
-| Button 4 | 20 | Unten Links | Mitte Rechts |
-| Button 5 | 21 | Unten Mitte | Unten Links |
-| Button 6 | 22 | Unten Rechts | Unten Rechts |
+| Button-Position | Button-ID | LED-ID | Landscape Layout | Portrait Layout |
+|----------------|-----------|--------|------------------|-----------------|
+| Button 1 | BTN.17 | LED.49 | Oben Links | Oben Links |
+| Button 2 | BTN.18 | LED.50 | Oben Mitte | Oben Rechts |
+| Button 3 | BTN.19 | LED.51 | Oben Rechts | Mitte Links |
+| Button 4 | BTN.20 | LED.52 | Unten Links | Mitte Rechts |
+| Button 5 | BTN.21 | LED.53 | Unten Mitte | Unten Links |
+| Button 6 | BTN.22 | LED.54 | Unten Rechts | Unten Rechts |
 
 ## 🚀 Installation
 
 ### Voraussetzungen
 
 1. **Arduino IDE** (Version 1.8.19 oder höher)
-2. **ESP32 Board Package** für Arduino IDE
+2. **ESP32 Board Package** für Arduino IDE (Version 3.2.0+)
 3. **Erforderliche Bibliotheken**:
    - `TFT_eSPI` (Version 2.4.0 oder höher)
    - `XPT2046_Touchscreen`
@@ -279,7 +327,7 @@ XPT2046_Touchscreen by Paul Stoffregen
    Arduino/libraries/TFT_eSPI/
    ```
 
-2. Öffnen Sie `User_Setup.h` und konfigurieren Sie für TZT ESP32 2.4":
+2. Ersetzen Sie `User_Setup.h` mit der bereitgestellten Konfiguration:
    ```cpp
    #define ST7789_DRIVER
    #define TFT_WIDTH  240
@@ -287,22 +335,24 @@ XPT2046_Touchscreen by Paul Stoffregen
    #define TFT_CS   15
    #define TFT_DC    2
    #define TFT_RST  -1
-   #define TFT_BL   27
+   // TFT_BL wird NICHT definiert (für eigene PWM-Steuerung)
    #define TFT_MOSI 13
    #define TFT_SCLK 14
    #define TFT_MISO 12
    #define TOUCH_CS 33
    ```
 
-### Projekt-Setup
+### Projekt-Setup (Version 1.50)
 
 1. **Projektverzeichnis erstellen**:
    ```
-   ESP32_Touch_Menu/
-   ├── ESP32_Touch_Menu.ino
+   ESP32_CYD_RS485_HAUS_BUS_V150/
+   ├── ESP32_CYD_RS485_HAUS-BUS.ino
    ├── config.h
    ├── communication.h
    ├── communication.cpp
+   ├── service_manager.h      # NEU
+   ├── service_manager.cpp    # NEU
    ├── menu.h
    ├── menu.cpp
    ├── touch.h
@@ -312,7 +362,8 @@ XPT2046_Touchscreen by Paul Stoffregen
    ├── backlight.h
    ├── backlight.cpp
    ├── led.h
-   └── led.cpp
+   ├── led.cpp
+   └── User_Setup.h          # TFT_eSPI Konfiguration
    ```
 
 2. **Kompilieren und Hochladen**:
@@ -321,6 +372,40 @@ XPT2046_Touchscreen by Paul Stoffregen
    - CPU Frequency: "240MHz (WiFi/BT)"
    - Flash Frequency: "80MHz"
    - Flash Size: "4MB (32Mb)"
+
+## 🎯 Quick-Setup Guide
+
+### 1. Erste Inbetriebnahme
+1. **Hardware verbinden** (RS485-Umsetzer, optional RGB-LED)
+2. **Code kompilieren und hochladen**
+3. **ESP32 startet** mit Standard-Konfiguration (Device ID: 5999, Landscape)
+
+### 2. Service-Modus konfigurieren
+1. **20 Sekunden Touch** auf beliebige Stelle → Service-Menü öffnet sich
+2. **Device ID** → Numpad verwenden → 4-stellige ID eingeben → OK
+3. **Orientierung** → Portrait/Landscape umschalten (sofortige Anwendung)
+4. **SAVE & EXIT** → Konfiguration dauerhaft speichern
+
+### 3. WiFi-Konfiguration (Optional)
+1. **Service-Modus** → "WiFi ON" → Access Point startet
+2. **Web Config** → IP-Adresse wird angezeigt (192.168.4.1)
+3. **Browser öffnen** → http://192.168.4.1 → Web-Interface
+4. **Remote-Konfiguration** über Webbrowser möglich
+
+### 4. Telegramm-Steuerung testen
+```bash
+# System-Befehle
+ý5999.SYS.1.SERVICE.1þ      # Service-Modus aktivieren
+ý5999.SYS.1.WIFI.1þ         # WiFi einschalten
+ý5999.SYS.1.RESET.0þ        # Neustart
+
+# Backlight-Steuerung
+ý5999.LBN.16.SET_MBR.50þ    # Helligkeit 50%
+
+# LED-Steuerung (korrigierte IDs)
+ý5999.LED.49.ON.100þ        # Button 1 → weiß hell
+ý5999.LED.49.ON.0þ          # Button 1 → grau
+```
 
 ## 🧪 Testmodus
 
@@ -339,155 +424,137 @@ XPT2046_Touchscreen by Paul Stoffregen
 | **BL+** | Helligkeit erhöhen | +10% Hintergrundbeleuchtung |
 | **BL-** | Helligkeit verringern | -10% Hintergrundbeleuchtung |
 
-### Touch-Kalibrierung
-
-1. **Kalibrierungskreuze antippen**: Berühren Sie die farbigen Kreuze an verschiedenen Positionen
-2. **Rohwerte prüfen**: Beobachten Sie die Raw X/Y Werte im unteren Bereich
-3. **Invertierung anpassen**: Nutzen Sie INV-X/INV-Y bei falscher Zuordnung
-4. **Position validieren**: Überprüfen Sie die Genauigkeit der Touch-Erkennung
-
 ## 🐛 Debugging
 
-### Debug-Ausgaben
-
-Das System bietet verschiedene Debug-Level:
+### Debug-Ausgaben (Version 1.50)
 
 ```cpp
 // In config.h aktivieren/deaktivieren:
-#define DB_TX_HEX 1      // Zeigt gesendete Telegramme in Hex
-#define DB_RX_HEX 1      // Zeigt empfangene Bytes in Hex
-#define DB_RX_INFO 1     // Zeigt Telegramm-Struktur
-#define RAW_DEBUG 1      // Zeigt alle Rohdaten
+#define DB_TX_HEX 0      // Zeigt gesendete Telegramme in Hex
+#define DB_RX_HEX 0      // Zeigt empfangene Bytes in Hex
+#define DB_RX_INFO 0     // Zeigt Telegramm-Struktur
+#define DB_INFO 0        // Service-Manager Debug-Ausgaben
 ```
 
 ### Typische Debug-Ausgaben
 
 ```
-Kommunikation initialisiert: UART2 für RS485
-- RX Pin: 21
-- TX Pin: 22  
-- Baudrate: 57600
-- Format: 8E1
-
-RS485 Daten verfügbar: 24 Bytes
-Neues Telegramm gestartet
-Telegramm vollständig empfangen
-0xFD 0x35 0x39 0x39 0x39 0x2E ... 0xFE
-Payload: 5999.LED.17.ON.100
-DeviceID: 5999, Function: LED, InstanceID: 17, Action: ON, Params: 100
-Button 1 (ID: 17) aktiviert
-```
-
-### Häufige Probleme und Lösungen
-
-#### Touch funktioniert nicht
-```cpp
-// Touch-Kalibrierung prüfen in config.h:
-#define TOUCH_MIN_X 400
-#define TOUCH_MAX_X 3900
-#define TOUCH_MIN_Y 400
-#define TOUCH_MAX_Y 3900
-
-// Touch-Invertierung im Testmodus anpassen
-```
-
-#### Keine RS485-Kommunikation
-```cpp
-// Hardware-Verbindungen prüfen:
-ESP32 GPIO21 (RX) → RS485 RO
-ESP32 GPIO22 (TX) → RS485 DI
-3.3V → RS485 VCC
-GND → RS485 GND
-
-// Baudrate und Format prüfen:
-SerialRS485.begin(57600, SERIAL_8E1, 21, 22);
-```
-
-#### Display zeigt nichts
-```cpp
-// TFT_eSPI User_Setup.h überprüfen:
-#define ST7789_DRIVER
-#define TFT_CS   15
-#define TFT_DC    2
-#define TFT_BL   27
-
-// Hintergrundbeleuchtung aktivieren:
-setBacklight(100);
+ServiceManager initialisiert - Version 1.50
+Konfiguration geladen - Device ID: 5999, Orientation: LANDSCAPE
+Service-Aktivierung gestartet (20 Sekunden)
+Service-Aktivierung 50%
+Service-Modus aktiviert
+LED 49 (Button 1) aktiviert - Weiß mit Helligkeit 100%
+WiFi AP gestartet - SSID: ESP32-ServiceMode
+Web-Server gestartet (vereinfacht)
 ```
 
 ## 🔧 Troubleshooting
 
-### Kommunikationsprobleme
+### Service-Menü Probleme
 
-1. **RS485-Verkabelung prüfen**:
-   - A/+ und B/- korrekt verbunden?
-   - Abschlusswiderstände (120Ω) an beiden Enden?
-   - Gemeinsame Masse zwischen allen Geräten?
+#### Service-Modus startet nicht
+```cpp
+// Debug aktivieren:
+#define DB_INFO 1
 
-2. **Baudrate validieren**:
-   ```cpp
-   // Testprogramm mit verschiedenen Baudraten:
-   SerialRS485.begin(9600, SERIAL_8E1, 21, 22);   // Test 1
-   SerialRS485.begin(57600, SERIAL_8E1, 21, 22);  // Standard
-   SerialRS485.begin(115200, SERIAL_8E1, 21, 22); // Test 2
-   ```
+// Überprüfen:
+- 20 Sekunden ununterbrochen berühren
+- Progress-Bar muss 100% erreichen
+- Alternativ: Telegramm ý5999.SYS.1.SERVICE.1þ senden
+```
 
-3. **Protokoll-Format überprüfen**:
-   ```
-   Korrekt:   ý5999.LED.17.ON.100þ
-   Falsch:    5999.LED.17.ON.100    (ohne START/END Bytes)
-   Falsch:    ý5999-LED-17-ON-100þ  (falsche Trennzeichen)
-   ```
+#### Device ID wird nicht gespeichert
+```cpp
+// EEPROM-Status prüfen:
+EEPROM.begin(512);  // Ausreichend Speicher reserviert?
 
-### Hardware-Diagnose
+// Debug-Ausgabe:
+Serial.println("Konfiguration gespeichert");
+```
 
-1. **LED-Test**:
-   ```cpp
-   // RGB-LED testen (negierte Logik!)
-   digitalWrite(LED_RED_PIN, LOW);    // Rot ein
-   digitalWrite(LED_GREEN_PIN, LOW);  // Grün ein
-   digitalWrite(LED_BLUE_PIN, LOW);   // Blau ein
-   ```
+#### WiFi funktioniert nicht
+```cpp
+// WiFi-Status prüfen:
+if (WiFi.getMode() == WIFI_AP) {
+  Serial.println("AP-Modus aktiv");
+  Serial.println(WiFi.softAPIP());
+}
 
-2. **Touchscreen-Test**:
-   ```cpp
-   // Raw-Werte im seriellen Monitor beobachten
-   TS_Point p = touchscreen.getPoint();
-   Serial.println("Raw X: " + String(p.x) + ", Raw Y: " + String(p.y));
-   ```
+// Manuell testen:
+WiFi.softAP("ESP32-ServiceMode", "service123");
+```
 
-3. **Display-Test**:
-   ```cpp
-   // Einfacher Farbtest
-   tft.fillScreen(TFT_RED);    // Vollbild rot
-   tft.fillScreen(TFT_GREEN);  // Vollbild grün
-   tft.fillScreen(TFT_BLUE);   // Vollbild blau
-   ```
+### Kommunikationsprobleme (CSMA/CD)
 
-### Performance-Optimierung
+#### Häufige Kollisionen
+```cpp
+// CSMA/CD Parameter anpassen:
+#define BUS_IDLE_TIME 20        // Längere Wartezeit
+#define COLLISION_DETECT_TIME 10 // Längere Kollisionserkennung
 
-1. **Speicher-Optimierung**:
-   ```cpp
-   // Unnötige Debug-Ausgaben deaktivieren:
-   #define DB_TX_HEX 0
-   #define DB_RX_HEX 0
-   #define RAW_DEBUG 0
-   ```
+// Statistiken prüfen:
+printCommunicationStats();
+```
 
-2. **Touch-Responsivität**:
-   ```cpp
-   // Touch-Entprellung anpassen:
-   delay(50);  // Standardwert
-   delay(30);  // Schnellere Reaktion
-   delay(80);  // Stabilere Erkennung
-   ```
+#### Sendepuffer läuft voll
+```cpp
+// Puffer-Größe erhöhen:
+#define SEND_QUEUE_SIZE 20
 
-3. **Kommunikations-Timing**:
-   ```cpp
-   // Status-Intervall anpassen:
-   #define BACKLIGHT_STATUS_INTERVAL 23000  // 23 Sekunden (Standard)
-   #define BACKLIGHT_STATUS_INTERVAL 10000  // 10 Sekunden (häufiger)
-   ```
+// Prioritäten optimieren:
+- Kritische Nachrichten: Priorität 0-1
+- Normal: Priorität 5
+- Status: Priorität 7-9
+```
+
+### LED-Button-Zuordnung
+
+#### Falsche LED reagiert
+```cpp
+// Korrekte Zuordnung prüfen:
+LED.49 → Button 1 (Index 0)
+LED.50 → Button 2 (Index 1)
+LED.51 → Button 3 (Index 2)
+LED.52 → Button 4 (Index 3)
+LED.53 → Button 5 (Index 4)
+LED.54 → Button 6 (Index 5)
+
+// Debug-Ausgabe:
+Serial.print("LED ID: "); Serial.print(ledId);
+Serial.print(" → Button Index: "); Serial.println(buttonIndex);
+```
+
+## 📊 Performance & Statistiken
+
+### CSMA/CD Monitoring
+```cpp
+// Statistiken alle 60 Sekunden ausgeben:
+printCommunicationStats();
+
+// Ausgabe-Beispiel:
+=== Kommunikations-Statistiken ===
+Gesendete Telegramme: 42
+Erkannte Kollisionen: 3
+Wiederholungen: 5
+Sendepuffer-Status: 2/10
+Bus-Status: Frei
+```
+
+### Service-Manager Status
+```cpp
+// Service-Menü Informationen:
+- Device ID: 5999
+- Orientierung: LANDSCAPE  
+- WiFi: Aktiv (192.168.4.1)
+- Konfiguration: Gespeichert
+```
+
+## 📄 Dokumentation
+
+- **[CHANGELOG.md](CHANGELOG.md)** - Versionshistorie und Änderungen
+- **[User_Setup.h](User_Setup.h)** - TFT_eSPI Konfiguration
+- **[Schaltplan/Pinout]** - Hardware-Dokumentation
 
 ## 📝 Lizenz
 
@@ -503,9 +570,12 @@ Bei Fragen oder Problemen:
 1. Überprüfen Sie zuerst die [Troubleshooting](#troubleshooting)-Sektion
 2. Aktivieren Sie Debug-Ausgaben für detaillierte Informationen
 3. Dokumentieren Sie das Problem mit Serial Monitor Ausgaben
+4. Erstellen Sie ein GitHub Issue mit allen relevanten Informationen
 
 ---
 
-**Version**: 2.2  
+**Version**: 1.50  
 **Datum**: Mai 2025  
-**Kompatibilität**: ESP32, Arduino IDE 1.8.19+
+**Kompatibilität**: ESP32, Arduino IDE 1.8.19+, TFT_eSPI 2.4.0+  
+**Hardware**: TZT ESP32 2.4" LCD (ST7789 + XPT2046)  
+**Features**: Service-Menü, WiFi AP, CSMA/CD, EEPROM-Config
