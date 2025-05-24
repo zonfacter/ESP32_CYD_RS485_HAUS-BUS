@@ -41,8 +41,7 @@ struct SendQueueItem {
   bool urgent;         // Sofort senden (für Antworten)
 };
 
-// Sendepuffer (Ring-Buffer)
-const int SEND_QUEUE_SIZE = 10;
+// Sendepuffer (Ring-Buffer) - verwendet #define aus config.h
 SendQueueItem sendQueue[SEND_QUEUE_SIZE];
 int sendQueueHead = 0;
 int sendQueueTail = 0;
@@ -550,70 +549,6 @@ void updateCommunication() {
   }
 }
 
-
-
-/**
- * RAW-Datenausgabe von RS485 für Diagnose
- */
-void dumpRawData() {
-  static unsigned long lastDumpTime = 0;
-  static String rawBuffer = "";
-  static unsigned long firstByteTime = 0;
-  bool newData = false;
-  
-  // Timestamp für das erste Byte
-  if (RS485Serial.available() > 0 && rawBuffer.length() == 0) {
-    firstByteTime = millis();
-  }
-  
-  while (RS485Serial.available() > 0) {
-    uint8_t byteValue = RS485Serial.read();
-    char c = (char)byteValue;
-    newData = true;
-    
-    // Timing-Info hinzufügen
-    if (rawBuffer.length() == 0) {
-      rawBuffer += "[T:";
-      rawBuffer += String(millis());
-      rawBuffer += "] ";
-    }
-    
-    // Byte formatieren
-    rawBuffer += "0x";
-    if (byteValue < 16) rawBuffer += "0";
-    rawBuffer += String(byteValue, HEX);
-    rawBuffer += " ";
-    
-    // Spezielle Markierungen
-    if (byteValue == START_BYTE) {
-      rawBuffer += "[START] ";
-    } else if (byteValue == END_BYTE) {
-      rawBuffer += "[END] ";
-    }
-    
-    // Bei lesbaren Zeichen auch ASCII anzeigen
-    if (c >= 32 && c <= 126) {
-      rawBuffer += "(";
-      rawBuffer += String(c);
-      rawBuffer += ") ";
-    }
-  }
-  
-  // Buffer ausgeben über USB
-  unsigned long currentMillis = millis();
-  if ((newData && rawBuffer.length() > 0) || 
-      (rawBuffer.length() > 0 && currentMillis - lastDumpTime >= 1000)) {
-    
-    Serial.print("RAW[");
-    Serial.print(currentMillis - firstByteTime);
-    Serial.print("ms]: ");
-    Serial.println(rawBuffer);
-    
-    rawBuffer = "";
-    lastDumpTime = currentMillis;
-  }
-}
-
 /**
  * Telegramm-Verarbeitung - KORRIGIERT für LED-IDs 49-54
  */
@@ -815,7 +750,6 @@ void processTelegram(String telegramStr) {
     Serial.println("DEBUG: Telegramm-Verarbeitung abgeschlossen");
   #endif
 }
-
 
 /**
  * Hex-Ausgabe für Debugging
