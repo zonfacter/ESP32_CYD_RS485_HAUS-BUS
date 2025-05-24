@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Touch Panel - Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🔧 ESP32 Touch Panel</h1>
+            <p>Live-Dashboard und Remote-Steuerung</p>
+        </header>
+
+        <nav class="navigation">
+            <a href="index.html" class="nav-link active">📊 Dashboard</a>
+            <a href="config.html" class="nav-link">⚙️ Konfiguration</a>
+            <a href="backup.html" class="nav-link">💾 Backup</a>
+            <a href="files.html" class="nav-link">📁 Dateien</a>
+            <a href="logs.html" class="nav-link">📋 Logs</a>
+        </nav>
+
+        <div class="grid">
+            <!-- System Status -->
+            <div class="card">
+                <h3>🖥️ System Status</h3>
+                <div class="stats">
+                    <div class="stat-item">
+                        <strong>Uptime</strong>
+                        <span id="uptime">Lade...</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Freier Speicher</strong>
+                        <span id="freeHeap">Lade...</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>WiFi Status</strong>
+                        <span id="wifiStatus" class="status-ok">AP Modus</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Device ID</strong>
+                        <span id="deviceId">5999</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Display Control -->
+            <div class="card">
+                <h3>🔆 Display-Steuerung</h3>
+                <div class="control-group">
+                    <label for="brightnessSlider">Helligkeit: <span id="brightnessValue">100%</span></label>
+                    <input type="range" id="brightnessSlider" min="0" max="100" value="100">
+                </div>
+                <div class="control-group">
+                    <label for="orientationSelect">Orientierung:</label>
+                    <select id="orientationSelect">
+                        <option value="0">Portrait</option>
+                        <option value="1" selected>Landscape</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Button Control -->
+            <div class="card">
+                <h3>🎛️ Remote Button-Steuerung</h3>
+                <p>Steuern Sie die Touch-Buttons remote über das Web-Interface:</p>
+                <div class="button-grid">
+                    <button class="device-button" data-button="1" onclick="toggleButton(1)">
+                        <span>Taster 1</span>
+                        <small>LED 49</small>
+                    </button>
+                    <button class="device-button" data-button="2" onclick="toggleButton(2)">
+                        <span>Taster 2</span>
+                        <small>LED 50</small>
+                    </button>
+                    <button class="device-button" data-button="3" onclick="toggleButton(3)">
+                        <span>Taster 3</span>
+                        <small>LED 51</small>
+                    </button>
+                    <button class="device-button" data-button="4" onclick="toggleButton(4)">
+                        <span>Taster 4</span>
+                        <small>LED 52</small>
+                    </button>
+                    <button class="device-button" data-button="5" onclick="toggleButton(5)">
+                        <span>Taster 5</span>
+                        <small>LED 53</small>
+                    </button>
+                    <button class="device-button" data-button="6" onclick="toggleButton(6)">
+                        <span>Taster 6</span>
+                        <small>LED 54</small>
+                    </button>
+                </div>
+            </div>
+
+            <!-- CSMA/CD Statistics -->
+            <div class="card">
+                <h3>📡 Kommunikations-Statistiken</h3>
+                <div class="stats">
+                    <div class="stat-item">
+                        <strong>Gesendete Telegramme</strong>
+                        <span id="totalSent">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Kollisionen</strong>
+                        <span id="totalCollisions">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Wiederholungen</strong>
+                        <span id="totalRetries">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Erfolgsrate</strong>
+                        <span id="successRate">100%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card">
+                <h3>⚡ Schnellaktionen</h3>
+                <div class="action-buttons">
+                    <button onclick="createBackup()" class="btn btn-primary">
+                        💾 Backup erstellen
+                    </button>
+                    <button onclick="factoryReset()" class="btn btn-warning">
+                        🔄 Factory Reset
+                    </button>
+                    <button onclick="rebootSystem()" class="btn btn-danger">
+                        🔴 Neustart
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="messageContainer"></div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // Dashboard-spezifische Funktionen
+        let buttonStates = [false, false, false, false, false, false];
+
+        function toggleButton(buttonNum) {
+            const currentState = buttonStates[buttonNum - 1];
+            const newState = !currentState;
+            
+            fetch('/api/button', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `button=${buttonNum}&state=${newState ? 1 : 0}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    buttonStates[buttonNum - 1] = newState;
+                    updateButtonUI(buttonNum, newState);
+                    showMessage(data.message, 'success');
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Button-Steuerung fehlgeschlagen: ' + error, 'error');
+            });
+        }
+
+        function updateButtonUI(buttonNum, isActive) {
+            const button = document.querySelector(`[data-button="${buttonNum}"]`);
+            if (button) {
+                if (isActive) {
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
+            }
+        }
+
+        function updateBrightness() {
+            const slider = document.getElementById('brightnessSlider');
+            const value = slider.value;
+            
+            fetch('/api/brightness', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `value=${value}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('brightnessValue').textContent = value + '%';
+                    showMessage(data.message, 'success');
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            });
+        }
+
+        function updateOrientation() {
+            const select = document.getElementById('orientationSelect');
+            const value = select.value;
+            
+            fetch('/api/orientation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `value=${value}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message + ' - Bitte warten Sie 5 Sekunden...', 'success');
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            });
+        }
+
+        function createBackup() {
+            fetch('/api/backup/create', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                showMessage(data.message, data.success ? 'success' : 'error');
+            });
+        }
+
+        function factoryReset() {
+            if (confirm('⚠️ WARNUNG: Alle Einstellungen werden gelöscht!\n\nFactory Reset wirklich durchführen?')) {
+                fetch('/api/system/reset', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    showMessage(data.message, 'warning');
+                });
+            }
+        }
+
+        function rebootSystem() {
+            if (confirm('System wirklich neu starten?')) {
+                fetch('/api/system/reboot', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    showMessage(data.message, 'info');
+                });
+            }
+        }
+
+        function updateDashboard() {
+            fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                // System-Status
+                document.getElementById('uptime').textContent = formatUptime(data.system.uptime);
+                document.getElementById('freeHeap').textContent = formatBytes(data.system.freeHeap);
+                document.getElementById('deviceId').textContent = data.device.id;
+                
+                // Helligkeit
+                document.getElementById('brightnessSlider').value = data.device.brightness;
+                document.getElementById('brightnessValue').textContent = data.device.brightness + '%';
+                
+                // Orientierung
+                document.getElementById('orientationSelect').value = data.device.orientation;
+                
+                // CSMA/CD-Statistiken
+                document.getElementById('totalSent').textContent = data.communication.totalSent;
+                document.getElementById('totalCollisions').textContent = data.communication.totalCollisions;
+                document.getElementById('totalRetries').textContent = data.communication.totalRetries;
+                
+                // Erfolgsrate berechnen
+                const total = data.communication.totalSent + data.communication.totalCollisions;
+                const successRate = total > 0 ? Math.round((data.communication.totalSent / total) * 100) : 100;
+                document.getElementById('successRate').textContent = successRate + '%';
+            })
+            .catch(error => {
+                console.error('Dashboard-Update fehlgeschlagen:', error);
+            });
+        }
+
+        // Event-Listener
+        document.getElementById('brightnessSlider').addEventListener('change', updateBrightness);
+        document.getElementById('orientationSelect').addEventListener('change', updateOrientation);
+
+        // Auto-Update alle 5 Sekunden
+        updateDashboard();
+        setInterval(updateDashboard, 5000);
+    </script>
+</body>
+</html>

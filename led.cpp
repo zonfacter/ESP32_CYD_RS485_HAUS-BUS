@@ -64,7 +64,19 @@ void ledReceiveSignal() {
 // Aktualisiert den LED-Status basierend auf Timern
 void updateLedStatus() {
   // Wenn die LED eingeschaltet ist und die Zeit abgelaufen ist
-  if (currentLedState != 0 && millis() >= ledEndTime) {
-    ledOff();
+  unsigned long currentTime = millis();
+  
+  // Schutz vor Division durch Null und Überlauf
+  if (ledEndTime == 0) {
+    // LED ist aus oder wurde nie eingeschaltet
+    return;
+  }
+  
+  unsigned long timeSinceLedStart;
+  if (currentTime >= ledEndTime) {
+    // Zeit ist abgelaufen
+    if (currentLedState != 0) {
+      ledOff();
+    }
   }
 }

@@ -7,6 +7,7 @@
  * - Orientierungs-Umschaltung
  * - Telegramm-Steuerung
  * - WiFi Access Point
+ * - Vollständiges Web-Interface
  */
 
 #ifndef SERVICE_MANAGER_H
@@ -53,15 +54,18 @@ private:
   ServiceButton serviceButtons[NUM_SERVICE_BUTTONS];
   
   // Device ID Editor
-  static const int NUM_NUMPAD_BUTTONS = 16;  // 0-9, +, -, <, >, OK, CANCEL
+  static const int NUM_NUMPAD_BUTTONS = 16;
   NumpadButton numpadButtons[NUM_NUMPAD_BUTTONS];
   String editDeviceID;
-  int editPosition;  // 0-3 für 4-stellige ID
+  int editPosition;
   
   // Aktuelle Konfiguration
   String currentDeviceID;
   int currentOrientation;
   bool configChanged;
+  
+  // *** NEU: Telegramm vs. Touch-Unterscheidung ***
+  bool activatedByTelegram;  // Flag für Telegramm-Aktivierung
   
   // WiFi und Web-Interface
   bool wifiActive;
@@ -119,7 +123,7 @@ private:
 
 public:
   ServiceManager();
-  
+  ServiceState getCurrentState() { return currentState; }
   // Haupt-Update-Funktion (in loop() aufrufen)
   void update();
   

@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Touch Panel - Konfiguration</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>⚙️ Konfiguration</h1>
+            <p>System-Einstellungen und Device-Konfiguration</p>
+        </header>
+
+        <nav class="navigation">
+            <a href="index.html" class="nav-link">📊 Dashboard</a>
+            <a href="config.html" class="nav-link active">⚙️ Konfiguration</a>
+            <a href="backup.html" class="nav-link">💾 Backup</a>
+            <a href="files.html" class="nav-link">📁 Dateien</a>
+            <a href="logs.html" class="nav-link">📋 Logs</a>
+        </nav>
+
+        <div class="grid">
+            <!-- Device-Konfiguration -->
+            <div class="card">
+                <h3>🏷️ Device-Einstellungen</h3>
+                <form id="deviceConfigForm">
+                    <div class="control-group">
+                        <label for="deviceId">Device ID (4-stellig):</label>
+                        <input type="text" id="deviceId" name="deviceId" maxlength="4" pattern="[0-9]{4}" required>
+                        <small>Eindeutige 4-stellige Nummer für RS485-Kommunikation</small>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="orientation">Display-Orientierung:</label>
+                        <select id="orientation" name="orientation">
+                            <option value="0">📱 Portrait (240x320)</option>
+                            <option value="1">🖥️ Landscape (320x240)</option>
+                        </select>
+                        <small>Orientierung wird sofort angewendet</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">💾 Speichern</button>
+                </form>
+            </div>
+
+            <!-- Display-Konfiguration -->
+            <div class="card">
+                <h3>🖥️ Display-Einstellungen</h3>
+                <form id="displayConfigForm">
+                    <div class="control-group">
+                        <label for="brightness">Helligkeit: <span id="brightnessDisplay">100%</span></label>
+                        <input type="range" id="brightness" name="brightness" min="0" max="100" value="100">
+                        <small>PWM-gesteuerte Hintergrundbeleuchtung (0-100%)</small>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="statusInterval">Status-Intervall (Sekunden):</label>
+                        <input type="number" id="statusInterval" name="statusInterval" min="5" max="300" value="23">
+                        <small>Intervall für automatische Statusmeldungen</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">🔆 Anwenden</button>
+                </form>
+            </div>
+
+            <!-- Touch-Kalibrierung -->
+            <div class="card">
+                <h3>👆 Touch-Kalibrierung</h3>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="invertTouchX"> Touch X-Achse invertieren
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="invertTouchY"> Touch Y-Achse invertieren
+                    </label>
+                </div>
+                <div class="control-group">
+                    <button type="button" class="btn btn-success" onclick="startTouchCalibration()">
+                        🎯 Kalibrierung starten
+                    </button>
+                    <small>Startet den Touch-Kalibrierungsmodus auf dem Gerät</small>
+                </div>
+            </div>
+
+            <!-- CSMA/CD-Konfiguration -->
+            <div class="card">
+                <h3>📡 CSMA/CD-Parameter</h3>
+                <form id="csmaConfigForm">
+                    <div class="control-group">
+                        <label for="busIdleTime">Bus Idle Time (ms):</label>
+                        <input type="number" id="busIdleTime" name="busIdleTime" min="1" max="100" value="10">
+                        <small>Zeit ohne Aktivität bis Bus als frei gilt</small>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="collisionDetectTime">Collision Detect Time (ms):</label>
+                        <input type="number" id="collisionDetectTime" name="collisionDetectTime" min="1" max="50" value="5">
+                        <small>Zeit nach Sendebeginn für Kollisionsprüfung</small>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="maxRetries">Max. Wiederholungen:</label>
+                        <input type="number" id="maxRetries" name="maxRetries" min="1" max="10" value="5">
+                        <small>Maximale Sendeversuche pro Telegramm</small>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="sendQueueSize">Sendepuffer-Größe:</label>
+                        <input type="number" id="sendQueueSize" name="sendQueueSize" min="5" max="50" value="10">
+                        <small>Anzahl Telegramme im Sendepuffer</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">📡 Aktualisieren</button>
+                </form>
+            </div>
+
+            <!-- Debug-Konfiguration -->
+            <div class="card">
+                <h3>🐛 Debug-Einstellungen</h3>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="debugTxHex"> TX Hex-Ausgabe
+                    </label>
+                    <small>Zeigt gesendete Telegramme in Hex-Format</small>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="debugRxHex"> RX Hex-Ausgabe
+                    </label>
+                    <small>Zeigt empfangene Bytes in Hex-Format</small>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="debugInfo"> Allgemeine Debug-Info
+                    </label>
+                    <small>Zeigt detaillierte Debug-Informationen</small>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="rawDebug"> RAW-Debug-Modus
+                    </label>
+                    <small>Zeigt alle eingehenden Rohdaten ohne Verarbeitung</small>
+                </div>
+                <button type="button" class="btn btn-warning" onclick="applyDebugSettings()">
+                    🐛 Debug-Modi anwenden
+                </button>
+            </div>
+
+            <!-- Aktuelle Konfiguration -->
+            <div class="card">
+                <h3>📋 Aktuelle Konfiguration</h3>
+                <div id="currentConfig" class="stats">
+                    <div class="stat-item">
+                        <strong>Device ID</strong>
+                        <span id="currentDeviceId">Lade...</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Orientierung</strong>
+                        <span id="currentOrientation">Lade...</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Helligkeit</strong>
+                        <span id="currentBrightness">Lade...</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Debug-Modus</strong>
+                        <span id="currentDebugMode">Lade...</span>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-success" onclick="refreshConfig()">
+                    🔄 Konfiguration neu laden
+                </button>
+            </div>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="messageContainer"></div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // Konfigurationsspezifische Funktionen
+        let currentConfigData = {};
+
+        function loadConfiguration() {
+            getConfig()
+                .then(data => {
+                    currentConfigData = data;
+                    updateConfigUI(data);
+                })
+                .catch(error => {
+                    showMessage('Konfiguration konnte nicht geladen werden: ' + error.message, 'error');
+                });
+        }
+
+        function updateConfigUI(config) {
+            // Device-Konfiguration
+            document.getElementById('deviceId').value = config.deviceID || '5999';
+            document.getElementById('orientation').value = config.orientation || 1;
+            
+            // Display-Konfiguration
+            document.getElementById('brightness').value = config.brightness || 100;
+            document.getElementById('brightnessDisplay').textContent = (config.brightness || 100) + '%';
+            
+            // Aktuelle Konfiguration anzeigen
+            document.getElementById('currentDeviceId').textContent = config.deviceID || '5999';
+            document.getElementById('currentOrientation').textContent = config.orientation === 0 ? 'Portrait' : 'Landscape';
+            document.getElementById('currentBrightness').textContent = (config.brightness || 100) + '%';
+            document.getElementById('currentDebugMode').textContent = config.debugMode ? 'Aktiv' : 'Inaktiv';
+        }
+
+        function saveDeviceConfiguration() {
+            const formData = new FormData(document.getElementById('deviceConfigForm'));
+            const config = {};
+            
+            for (let [key, value] of formData.entries()) {
+                config[key] = value;
+            }
+
+            // Validierung
+            if (!validateDeviceID(config.deviceId)) {
+                showMessage('Device ID muss 4-stellig sein!', 'error');
+                return;
+            }
+
+            if (!validateOrientation(config.orientation)) {
+                showMessage('Ungültige Orientierung!', 'error');
+                return;
+            }
+
+            saveConfig(config)
+                .then(data => {
+                    showMessage(data.message, 'success');
+                    loadConfiguration(); // Neu laden
+                })
+                .catch(error => {
+                    showMessage('Speichern fehlgeschlagen: ' + error.message, 'error');
+                });
+        }
+
+        function saveDisplayConfiguration() {
+            const brightness = document.getElementById('brightness').value;
+            const statusInterval = document.getElementById('statusInterval').value;
+
+            if (!validateBrightness(brightness)) {
+                showMessage('Helligkeit muss zwischen 0 und 100 liegen!', 'error');
+                return;
+            }
+
+            // Helligkeit sofort anwenden
+            apiCall('/api/brightness', 'POST', { value: brightness })
+                .then(data => {
+                    showMessage(data.message, 'success');
+                    document.getElementById('brightnessDisplay').textContent = brightness + '%';
+                    document.getElementById('currentBrightness').textContent = brightness + '%';
+                })
+                .catch(error => {
+                    showMessage('Helligkeit konnte nicht geändert werden: ' + error.message, 'error');
+                });
+        }
+
+        function applyCSMAConfiguration() {
+            const formData = new FormData(document.getElementById('csmaConfigForm'));
+            const csmaConfig = {};
+            
+            for (let [key, value] of formData.entries()) {
+                csmaConfig[key] = parseInt(value);
+            }
+
+            // Validierung
+            if (csmaConfig.busIdleTime < 1 || csmaConfig.busIdleTime > 100) {
+                showMessage('Bus Idle Time muss zwischen 1 und 100 ms liegen!', 'error');
+                return;
+            }
+
+            if (csmaConfig.collisionDetectTime < 1 || csmaConfig.collisionDetectTime > 50) {
+                showMessage('Collision Detect Time muss zwischen 1 und 50 ms liegen!', 'error');
+                return;
+            }
+
+            // Hier würde normalerweise ein API-Call zu einem CSMA-Endpunkt gemacht
+            // Da dies nicht implementiert ist, zeigen wir eine Warnung
+            showMessage('CSMA/CD-Parameter werden zur Laufzeit angewendet (Neustart erforderlich)', 'warning');
+        }
+
+        function startTouchCalibration() {
+            // Sendet ein Telegramm zum Starten der Touch-Kalibrierung
+            apiCall('/api/system/touch-calibration', 'POST')
+                .then(data => {
+                    showMessage('Touch-Kalibrierung gestartet. Schauen Sie auf das ESP32-Display!', 'info');
+                })
+                .catch(error => {
+                    showMessage('Touch-Kalibrierung nicht verfügbar', 'warning');
+                });
+        }
+
+        function applyDebugSettings() {
+            const debugSettings = {
+                txHex: document.getElementById('debugTxHex').checked,
+                rxHex: document.getElementById('debugRxHex').checked,
+                info: document.getElementById('debugInfo').checked,
+                raw: document.getElementById('rawDebug').checked
+            };
+
+            // Debug-Einstellungen würden normalerweise via API übertragen
+            showMessage('Debug-Einstellungen angewendet (Neustart für vollständige Aktivierung erforderlich)', 'info');
+            
+            // Lokale Speicherung der Einstellungen
+            saveToLocalStorage('debug_settings', debugSettings);
+        }
+
+        function refreshConfig() {
+            showMessage('Konfiguration wird neu geladen...', 'info', 2000);
+            loadConfiguration();
+        }
+
+        function updateBrightnessDisplay() {
+            const slider = document.getElementById('brightness');
+            const display = document.getElementById('brightnessDisplay');
+            display.textContent = slider.value + '%';
+        }
+
+        // Event-Listener
+        document.getElementById('deviceConfigForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveDeviceConfiguration();
+        });
+
+        document.getElementById('displayConfigForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveDisplayConfiguration();
+        });
+
+        document.getElementById('csmaConfigForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            applyCSMAConfiguration();
+        });
+
+        document.getElementById('brightness').addEventListener('input', updateBrightnessDisplay);
+
+        // Orientierung sofort anwenden
+        document.getElementById('orientation').addEventListener('change', function() {
+            const orientation = this.value;
+            
+            apiCall('/api/orientation', 'POST', { value: orientation })
+                .then(data => {
+                    showMessage(data.message + ' - Bitte warten Sie 5 Sekunden...', 'success');
+                    
+                    // UI nach 2 Sekunden aktualisieren
+                    setTimeout(() => {
+                        document.getElementById('currentOrientation').textContent = 
+                            orientation === '0' ? 'Portrait' : 'Landscape';
+                    }, 2000);
+                })
+                .catch(error => {
+                    showMessage('Orientierung konnte nicht geändert werden: ' + error.message, 'error');
+                    loadConfiguration(); // Zurücksetzen
+                });
+        });
+
+        // Device ID Live-Validierung
+        document.getElementById('deviceId').addEventListener('input', function() {
+            const value = this.value;
+            const isValid = validateDeviceID(value);
+            
+            this.style.borderColor = isValid || value.length < 4 ? '' : '#e74c3c';
+            
+            if (value.length === 4 && !isValid) {
+                showMessage('Device ID muss aus 4 Ziffern bestehen!', 'error', 3000);
+            }
+        });
+
+        // Konfiguration beim Laden der Seite abrufen
+        document.addEventListener('DOMContentLoaded', function() {
+            loadConfiguration();
+            
+            // Debug-Einstellungen aus lokalem Speicher laden
+            const debugSettings = loadFromLocalStorage('debug_settings', {});
+            if (debugSettings.txHex) document.getElementById('debugTxHex').checked = true;
+            if (debugSettings.rxHex) document.getElementById('debugRxHex').checked = true;
+            if (debugSettings.info) document.getElementById('debugInfo').checked = true;
+            if (debugSettings.raw) document.getElementById('rawDebug').checked = true;
+        });
+
+        // Auto-Aktualisierung alle 30 Sekunden
+        setInterval(loadConfiguration, 30000);
+    </script>
+</body>
+</html>

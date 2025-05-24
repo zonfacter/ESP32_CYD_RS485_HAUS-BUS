@@ -16,7 +16,7 @@
 #define DB_TX_INFO 0     // Allgemeine Informationen zum Senden (1=ein, 0=aus)
 #define DB_RX_HEX 0      // Hex-Ausgabe für empfangene Bytes (1=ein, 0=aus)
 #define DB_RX_INFO 0     // Allgemeine Informationen zum Empfang (1=ein, 0=aus)
-#define DB_INFO 0        // Allgemeine Debug-Informationen (1=ein, 0=aus)
+#define DB_INFO 1        // Allgemeine Debug-Informationen (1=ein, 0=aus)
 
 // RAW-Debug-Modus für eingehende Daten - zeigt alle empfangenen Bytes ohne Verarbeitung
 #define RAW_DEBUG 1      // RAW-Modus für eingehende Daten (1=ein, 0=aus)

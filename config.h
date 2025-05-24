@@ -1,4 +1,4 @@
-// config.h - Erweiterte Konfiguration für CSMA/CD
+// config.h - Korrigierte Konfiguration (Version 1.50 Stable)
 #ifndef CONFIG_H
 #define CONFIG_H
 
@@ -40,11 +40,11 @@ extern HardwareSerial RS485Serial;
 #define TELEGRAM_TIMEOUT_MS 50   // Timeout für komplettes Telegramm (ms)
 #define INTER_FRAME_DELAY 5      // Verzögerung zwischen Frames (ms)
 
-// *** NEU: CSMA/CD-Parameter ***
-extern const unsigned long BUS_IDLE_TIME;         // Zeit ohne Aktivität = Bus frei (ms)
-extern const unsigned long COLLISION_DETECT_TIME; // Zeit nach Sendebeginn für Kollisionsprüfung (ms)
+// CSMA/CD-Parameter (STATISCH - keine Division-durch-Null möglich)
+#define BUS_IDLE_TIME_MS 10          // Zeit ohne Aktivität = Bus frei (ms)
+#define COLLISION_DETECT_TIME_MS 5   // Zeit nach Sendebeginn für Kollisionsprüfung (ms)
 #define MAX_TRANSMISSION_ATTEMPTS 3  // Maximale Sendeversuche pro Telegramm
-extern const int SEND_QUEUE_SIZE;       // Größe des Sendepuffers
+#define SEND_QUEUE_SIZE 10           // Größe des Sendepuffers
 #define MAX_RETRIES_PER_TELEGRAM 5   // Maximale Wiederholungen pro Telegramm
 
 // Prioritätsstufen für verschiedene Nachrichtentypen
@@ -84,10 +84,13 @@ extern XPT2046_Touchscreen touchscreen;
 #define PWM_RESOLUTION 8        // PWM-Auflösung
 #define DEFAULT_BACKLIGHT 100   // Standardhelligkeit
 
-// Display-Konfiguration
+// Display-Konfiguration - STATISCH für Kompilierung
 #define PORTRAIT 0
 #define LANDSCAPE 1
-#define SCREEN_ORIENTATION LANDSCAPE
+
+// Fallback-Orientierung für statische Kompilierung
+#define FALLBACK_ORIENTATION LANDSCAPE
+#define SCREEN_ORIENTATION FALLBACK_ORIENTATION
 
 #if SCREEN_ORIENTATION == PORTRAIT
   #define SCREEN_WIDTH 240
@@ -109,7 +112,7 @@ extern bool invertTouchY;
 // Kommunikationsprotokoll
 #define START_BYTE 0xFD        // Startbyte für Telegramme
 #define END_BYTE 0xFE          // Endbyte für Telegramme
-#define DEVICE_ID "5999"       // Eindeutige Geräte-ID
+#define DEVICE_ID "5999"       // Eindeutige Geräte-ID (kann über Service-Manager geändert werden)
 
 // Timing für Status-Updates
 #define BACKLIGHT_STATUS_INTERVAL 23000  // Intervall für Backlight-Status
@@ -144,20 +147,11 @@ extern bool receivingTelegram;
 extern unsigned long lastByteTime;
 extern unsigned long telegramStartTime;
 
-// *** NEU: CSMA/CD Variablen ***
+// CSMA/CD Variablen
 extern bool busIdle;
 extern unsigned long lastBusActivity;
 
-// *** NEU: Sendepuffer-Struktur - wird in communication.cpp genutzt***
-/*struct SendQueueItem {
-  String telegram;
-  unsigned long timestamp;
-  int retryCount;
-  int priority;        // 0=höchste Priorität, 9=niedrigste
-  bool urgent;         // Sofort senden (für Antworten)
-};*/
-
-// *** NEU: Statistik-Variablen ***
+// Statistik-Variablen
 extern unsigned long totalSent;
 extern unsigned long totalCollisions;
 extern unsigned long totalRetries;
