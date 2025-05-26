@@ -13,6 +13,7 @@
 #include "menu.h"
 #include "led.h"
 #include "service_manager.h"  // NEU: Include für ServiceManager
+#include "header_display.h"  // Für Zeit/Datum Funktionen
 
 // Separate UART2-Instanz für RS485
 HardwareSerial RS485Serial(2);
@@ -41,8 +42,7 @@ struct SendQueueItem {
   bool urgent;         // Sofort senden (für Antworten)
 };
 
-// Sendepuffer (Ring-Buffer)
-const int SEND_QUEUE_SIZE = 10;
+// Sendepuffer (Ring-Buffer) - verwendet #define aus config.h
 SendQueueItem sendQueue[SEND_QUEUE_SIZE];
 int sendQueueHead = 0;
 int sendQueueTail = 0;
@@ -329,14 +329,24 @@ bool transmitWithCSMA(const String& telegram, int maxRetries) {
  * Öffentliche Sendefunktion - fügt zum Puffer hinzu
  */
 void sendTelegram(String function, String instanceID, String action, String params) {
-  // Telegramm aufbauen
-  String telegram = String((char)START_BYTE) + DEVICE_ID + "." + function + "." + instanceID + "." + action;
+  // *** KORRIGIERT: Device ID vom ServiceManager holen ***
+  String currentDeviceID = serviceManager.getDeviceID();
+  
+  // Telegramm aufbauen mit aktueller Device ID
+  String telegram = String((char)START_BYTE) + currentDeviceID + "." + function + "." + instanceID + "." + action;
   
   if (params != "") {
     telegram += "." + params;
   }
   
   telegram += String((char)END_BYTE);
+  
+  #if DB_TX_INFO == 1
+    Serial.print("DEBUG: Sende Telegramm mit Device ID ");
+    Serial.print(currentDeviceID);
+    Serial.print(": ");
+    Serial.println(telegram);
+  #endif
   
   // Priorität bestimmen
   int priority = 5;  // Standard-Priorität
@@ -550,72 +560,12 @@ void updateCommunication() {
   }
 }
 
-
-
 /**
- * RAW-Datenausgabe von RS485 für Diagnose
+ * Vollständige processTelegram() Funktion mit korrigierter Device ID Verwendung
  */
-void dumpRawData() {
-  static unsigned long lastDumpTime = 0;
-  static String rawBuffer = "";
-  static unsigned long firstByteTime = 0;
-  bool newData = false;
-  
-  // Timestamp für das erste Byte
-  if (RS485Serial.available() > 0 && rawBuffer.length() == 0) {
-    firstByteTime = millis();
-  }
-  
-  while (RS485Serial.available() > 0) {
-    uint8_t byteValue = RS485Serial.read();
-    char c = (char)byteValue;
-    newData = true;
-    
-    // Timing-Info hinzufügen
-    if (rawBuffer.length() == 0) {
-      rawBuffer += "[T:";
-      rawBuffer += String(millis());
-      rawBuffer += "] ";
-    }
-    
-    // Byte formatieren
-    rawBuffer += "0x";
-    if (byteValue < 16) rawBuffer += "0";
-    rawBuffer += String(byteValue, HEX);
-    rawBuffer += " ";
-    
-    // Spezielle Markierungen
-    if (byteValue == START_BYTE) {
-      rawBuffer += "[START] ";
-    } else if (byteValue == END_BYTE) {
-      rawBuffer += "[END] ";
-    }
-    
-    // Bei lesbaren Zeichen auch ASCII anzeigen
-    if (c >= 32 && c <= 126) {
-      rawBuffer += "(";
-      rawBuffer += String(c);
-      rawBuffer += ") ";
-    }
-  }
-  
-  // Buffer ausgeben über USB
-  unsigned long currentMillis = millis();
-  if ((newData && rawBuffer.length() > 0) || 
-      (rawBuffer.length() > 0 && currentMillis - lastDumpTime >= 1000)) {
-    
-    Serial.print("RAW[");
-    Serial.print(currentMillis - firstByteTime);
-    Serial.print("ms]: ");
-    Serial.println(rawBuffer);
-    
-    rawBuffer = "";
-    lastDumpTime = currentMillis;
-  }
-}
-
 /**
- * Telegramm-Verarbeitung - KORRIGIERT für LED-IDs 49-54
+ * ERSETZE in communication.cpp die processTelegram() Funktion
+ * Mit Service-Mode Filterung für LED-Telegramme
  */
 void processTelegram(String telegramStr) {
   // Überprüfen, ob das Telegramm das richtige Format hat
@@ -653,26 +603,54 @@ void processTelegram(String telegramStr) {
   String deviceId = payload.substring(0, firstDot);
   String remainder = payload.substring(firstDot + 1);
 
+  // Aktuelle Device ID vom ServiceManager holen
+  String currentDeviceID = serviceManager.getDeviceID();
+  
   // Prüfen, ob es unser Gerät ist
-  if (deviceId != DEVICE_ID) {
+  if (deviceId != currentDeviceID) {
     #if DB_RX_INFO == 1
-      Serial.print("DEBUG: Telegramm nicht für uns (DeviceID: ");
+      Serial.print("DEBUG: Telegramm nicht für uns - empfangen für Device ID: ");
       Serial.print(deviceId);
-      Serial.println(")");
+      Serial.print(", unsere ID: ");
+      Serial.println(currentDeviceID);
     #endif
     return;
   }
 
+  // *** NEU: Service-Mode Check - nur bestimmte Funktionen erlauben ***
+  bool isServiceMode = serviceManager.isServiceMode();
+  
+  // Weitere Zerlegung für Funktions-Check
+  int secondDot = remainder.indexOf('.');
+  if (secondDot == -1) return;
+  String function = remainder.substring(0, secondDot);
+
+  if (isServiceMode) {
+    // *** IM SERVICE-MODUS: Nur System-Funktionen erlauben ***
+    if (function != "SYS" && function != "TIME" && function != "DATE") {
+      #if DB_RX_INFO == 1
+        Serial.print("DEBUG: Service-Modus aktiv - ");
+        Serial.print(function);
+        Serial.println("-Telegramm wird blockiert (nur SYS/TIME/DATE erlaubt)");
+      #endif
+      return;  // LED, LBN, BTN Telegramme werden im Service-Modus ignoriert
+    }
+    
+    #if DB_RX_INFO == 1
+      Serial.print("DEBUG: Service-Modus aktiv - ");
+      Serial.print(function);
+      Serial.println("-Telegramm wird verarbeitet");
+    #endif
+  }
+
   #if DB_RX_INFO == 1
-    Serial.print("DEBUG: Telegramm für uns! Verarbeite: ");
+    Serial.print("DEBUG: Telegramm für uns! Device ID: ");
+    Serial.print(currentDeviceID);
+    Serial.print(" - Verarbeite: ");
     Serial.println(remainder);
   #endif
 
-  // Weitere Zerlegung
-  int secondDot = remainder.indexOf('.');
-  if (secondDot == -1) return;
-
-  String function = remainder.substring(0, secondDot);
+  // Rest der Zerlegung
   String rest = remainder.substring(secondDot + 1);
 
   int thirdDot = rest.indexOf('.');
@@ -698,7 +676,7 @@ void processTelegram(String telegramStr) {
 
   // Funktionen verarbeiten
   if (function == "LBN") {
-    // Backlight-Steuerung
+    // Backlight-Steuerung (nur im Normal-Modus)
     if (action == "SET_MBR") {
       int brightness = params.toInt();
       if (brightness >= 0 && brightness <= 100) {
@@ -715,21 +693,18 @@ void processTelegram(String telegramStr) {
     }
   }
   else if (function == "SYS") {
-    // System-Steuerung
+    // System-Steuerung (immer erlaubt)
     if (action == "RESET") {
       #if DB_RX_INFO == 1
         Serial.println("DEBUG: SYSTEM RESET empfangen!");
         Serial.println("DEBUG: ESP32 wird in 2 Sekunden neu gestartet...");
-        Serial.flush(); // Sicherstellen, dass alle Debug-Nachrichten gesendet werden
+        Serial.flush();
       #endif
       
-      // Kurze Verzögerung für Debug-Ausgabe und eventuell letzte Kommunikation
       delay(2000);
-      
-      // ESP32 Neustart
       ESP.restart();
-    } else if (action == "SERVICE" || action == "WIFI" || action == "WEBSERVER") {
-      // *** ERWEITERT: Service-Modus Steuerung per Telegramm ***
+    } else if (action == "SERVICE" || action == "WIFI" || action == "WEBSERVER" || 
+               action == "DEVICE_ID" || action == "ORIENTATION") {
       #if DB_RX_INFO == 1
         Serial.print("DEBUG: SYS.");
         Serial.print(action);
@@ -737,12 +712,11 @@ void processTelegram(String telegramStr) {
         Serial.println(params);
       #endif
       
-      // Service-Manager direkt verwenden (extern ist bereits deklariert)
       serviceManager.handleServiceTelegram(action, params);
     }
   }
   else if (function == "LED") {
-    // LED-Steuerung - KORRIGIERT: LED-IDs 49-54 auf Button-Indizes 0-5 mappen
+    // LED-Steuerung (nur im Normal-Modus, bereits durch Service-Check blockiert)
     int ledId = instanceId.toInt();
     if (ledId >= 49 && ledId <= 54) {  // LED-IDs 49-54
       int buttonIndex = ledId - 49;    // Button-Index 0-5 (Button 1-6)
@@ -763,7 +737,9 @@ void processTelegram(String telegramStr) {
               Serial.print(ledId);
               Serial.print(" (Button ");
               Serial.print(buttonIndex + 1);
-              Serial.print(") aktiviert - Weiß mit Helligkeit ");
+              Serial.print(") aktiviert mit Device ID ");
+              Serial.print(currentDeviceID);
+              Serial.print(" - Weiß mit Helligkeit ");
               Serial.print(brightness);
               Serial.print("% (RGB: ");
               Serial.print(level);
@@ -778,7 +754,9 @@ void processTelegram(String telegramStr) {
               Serial.print(ledId);
               Serial.print(" (Button ");
               Serial.print(buttonIndex + 1);
-              Serial.println(") deaktiviert - ON.0 = Grau");
+              Serial.print(") deaktiviert mit Device ID ");
+              Serial.print(currentDeviceID);
+              Serial.println(" - ON.0 = Grau");
             #endif
           }
           redrawButton(buttonIndex);
@@ -792,7 +770,9 @@ void processTelegram(String telegramStr) {
             Serial.print(ledId);
             Serial.print(" (Button ");
             Serial.print(buttonIndex + 1);
-            Serial.println(") deaktiviert - OFF = Grau");
+            Serial.print(") deaktiviert mit Device ID ");
+            Serial.print(currentDeviceID);
+            Serial.println(" - OFF = Grau");
           #endif
         }
       }
@@ -804,8 +784,42 @@ void processTelegram(String telegramStr) {
       #endif
     }
   }
+  else if (function == "TIME") {
+    // Zeit-Steuerung (immer erlaubt)
+    if (action == "SET") {
+      handleTimeSetTelegram(params);
+    } else if (action == "GET") {
+      String timeStr = String(currentTime.hour < 10 ? "0" : "") + String(currentTime.hour) +
+                      String(currentTime.minute < 10 ? "0" : "") + String(currentTime.minute) +
+                      String(currentTime.second < 10 ? "0" : "") + String(currentTime.second);
+      
+      sendTelegram("TIME", "STATUS", timeStr, "");
+      
+      #if DB_RX_INFO == 1
+        Serial.print("DEBUG: Zeit-Status gesendet: ");
+        Serial.println(timeStr);
+      #endif
+    }
+  }
+  else if (function == "DATE") {
+    // Datum-Steuerung (immer erlaubt)
+    if (action == "SET") {
+      handleDateSetTelegram(params);
+    } else if (action == "GET") {
+      String dateStr = String(currentTime.day < 10 ? "0" : "") + String(currentTime.day) +
+                      String(currentTime.month < 10 ? "0" : "") + String(currentTime.month) +
+                      String(currentTime.year);
+      
+      sendTelegram("DATE", "STATUS", dateStr, "");
+      
+      #if DB_RX_INFO == 1
+        Serial.print("DEBUG: Datum-Status gesendet: ");
+        Serial.println(dateStr);
+      #endif
+    }
+  }
   else if (function == "BTN") {
-    // Button-Status (wird normalerweise nur gesendet, nicht empfangen)
+    // Button-Status (nur im Normal-Modus, bereits durch Service-Check blockiert)
     #if DB_RX_INFO == 1
       Serial.println("DEBUG: Button-Status empfangen (ungewöhnlich)");
     #endif
@@ -815,7 +829,6 @@ void processTelegram(String telegramStr) {
     Serial.println("DEBUG: Telegramm-Verarbeitung abgeschlossen");
   #endif
 }
-
 
 /**
  * Hex-Ausgabe für Debugging
@@ -830,3 +843,4 @@ void printTelegramHex(String telegram) {
   }
   Serial.println();
 }
+

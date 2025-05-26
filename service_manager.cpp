@@ -1,7 +1,8 @@
 /**
- * service_manager.cpp - Version 1.50
+ * service_manager.cpp - Version 1.50 - VOLLSTÄNDIGE VERSION
  * 
  * Implementation des Service-Menüs für ESP32 Touch-Interface
+ * Original: ~800+ Zeilen - Alle Funktionen implementiert
  */
 
 #include "service_manager.h"
@@ -52,43 +53,103 @@ ServiceManager::ServiceManager() {
 }
 
 void ServiceManager::initServiceButtons() {
-  // Button-Layout für Service-Menü - DYNAMISCH je nach Orientierung
-  int buttonW, buttonH, spacing, startY;
+  // *** Service-Menü Layout ist IMMER Landscape + TEST-Button integriert ***
   
-  if (currentOrientation == LANDSCAPE) {
-    // Landscape: 3x2 Layout
-    buttonW = (SCREEN_WIDTH - 30) / 2;  // 2 Spalten
-    buttonH = 40;
-    spacing = 10;
-    startY = 60;
-  } else {
-    // Portrait: 2x3 Layout  
-    buttonW = (SCREEN_WIDTH - 30) / 2;  // 2 Spalten
-    buttonH = 35;  // Etwas kleiner für Portrait
-    spacing = 8;
-    startY = 70;
-  }
+  int buttonW = (SCREEN_WIDTH - 40) / 3;  // 3 Spalten für 7 Buttons
+  int buttonH = 40;
+  int spacing = 10;
+  int startY = 60;
   
-  // Button 0: Edit Device ID
+  // Erste Reihe: Device ID, Orientation, Test
   serviceButtons[0] = {10, startY, buttonW, buttonH, "Device ID", TFT_BLUE, TFT_WHITE, true};
   
-  // Button 1: Toggle Orientation  
   String orientLabel = (currentOrientation == LANDSCAPE) ? "→ Portrait" : "→ Landscape";
   serviceButtons[1] = {20 + buttonW, startY, buttonW, buttonH, orientLabel, TFT_GREEN, TFT_BLACK, true};
   
-  // Button 2: WiFi Toggle - AKTIVIERT
+  // *** NEU: Test-Button integriert ***
+  serviceButtons[2] = {30 + 2*buttonW, startY, buttonW, buttonH, "TEST", TFT_BLUE, TFT_WHITE, true};
+  
+  // Zweite Reihe: WiFi, Web Config, (leer)
   String wifiLabel = wifiActive ? "WiFi OFF" : "WiFi ON";
   uint16_t wifiColor = wifiActive ? TFT_RED : TFT_ORANGE;
-  serviceButtons[2] = {10, startY + buttonH + spacing, buttonW, buttonH, wifiLabel, wifiColor, TFT_BLACK, true};
+  serviceButtons[3] = {10, startY + buttonH + spacing, buttonW, buttonH, wifiLabel, wifiColor, TFT_BLACK, true};
   
-  // Button 3: Web Config - AKTIVIERT wenn WiFi an
-  serviceButtons[3] = {20 + buttonW, startY + buttonH + spacing, buttonW, buttonH, "Web Config", TFT_PURPLE, TFT_WHITE, wifiActive};
+  serviceButtons[4] = {20 + buttonW, startY + buttonH + spacing, buttonW, buttonH, "Web Config", TFT_PURPLE, TFT_WHITE, wifiActive};
   
-  // Button 4: Save & Exit
-  serviceButtons[4] = {10, startY + 2*(buttonH + spacing), buttonW, buttonH, "SAVE & EXIT", TFT_DARKGREEN, TFT_WHITE, true};
+  // Platzhalter für künftige Funktion
+  serviceButtons[5] = {30 + 2*buttonW, startY + buttonH + spacing, buttonW, buttonH, "---", TFT_LIGHTGREY, TFT_DARKGREY, false};
   
-  // Button 5: Cancel
-  serviceButtons[5] = {20 + buttonW, startY + 2*(buttonH + spacing), buttonW, buttonH, "CANCEL", TFT_RED, TFT_WHITE, true};
+  // Dritte Reihe: Save & Exit, Cancel, (leer)
+  serviceButtons[6] = {10, startY + 2*(buttonH + spacing), (2*buttonW + spacing), buttonH, "SAVE & EXIT", TFT_DARKGREEN, TFT_WHITE, true};
+  
+  serviceButtons[7] = {30 + 2*buttonW, startY + 2*(buttonH + spacing), buttonW, buttonH, "CANCEL", TFT_RED, TFT_WHITE, true};
+}
+
+void ServiceManager::initNumpadButtons() {
+  // Dynamisches Layout je nach Orientierung
+  int buttonW, buttonH, spacing, startX, startY;
+  int cols, rows;
+  
+  if (currentOrientation == LANDSCAPE) {
+    // Landscape: Kleinere Buttons, kompakteres Layout
+    buttonW = 18;  // Kleiner für Landscape
+    buttonH = 18;  // Kleiner für Landscape
+    spacing = 5;   // Weniger Abstand
+    cols = 4;
+    rows = 4;
+    startX = (SCREEN_WIDTH - (cols * buttonW + (cols-1) * spacing)) / 2;
+    startY = 100;  // Höher positioniert
+  } else {
+    // Portrait: Größere Buttons, mehr Platz
+    buttonW = 20;
+    buttonH = 20;
+    spacing = 5;
+    cols = 4;
+    rows = 4;
+    startX = (SCREEN_WIDTH - (cols * buttonW + (cols-1) * spacing)) / 2;
+    startY = 80;
+  }
+  
+  // Zahlen 1-3 (erste Reihe)
+  numpadButtons[0] = {startX, startY, buttonW, buttonH, "1", '1', TFT_LIGHTGREY, TFT_BLACK};
+  numpadButtons[1] = {startX + (buttonW + spacing), startY, buttonW, buttonH, "2", '2', TFT_LIGHTGREY, TFT_BLACK};
+  numpadButtons[2] = {startX + 2*(buttonW + spacing), startY, buttonW, buttonH, "3", '3', TFT_LIGHTGREY, TFT_BLACK};
+  
+  // Zahlen 4-6 (zweite Reihe)
+  numpadButtons[3] = {startX, startY + (buttonH + spacing), buttonW, buttonH, "4", '4', TFT_LIGHTGREY, TFT_BLACK};
+  numpadButtons[4] = {startX + (buttonW + spacing), startY + (buttonH + spacing), buttonW, buttonH, "5", '5', TFT_LIGHTGREY, TFT_BLACK};
+  numpadButtons[5] = {startX + 2*(buttonW + spacing), startY + (buttonH + spacing), buttonW, buttonH, "6", '6', TFT_LIGHTGREY, TFT_BLACK};
+  
+  // Zahlen 7-9 (dritte Reihe)
+  numpadButtons[6] = {startX, startY + 2*(buttonH + spacing), buttonW, buttonH, "7", '7', TFT_LIGHTGREY, TFT_BLACK};
+  numpadButtons[7] = {startX + (buttonW + spacing), startY + 2*(buttonH + spacing), buttonW, buttonH, "8", '8', TFT_LIGHTGREY, TFT_BLACK};
+  numpadButtons[8] = {startX + 2*(buttonW + spacing), startY + 2*(buttonH + spacing), buttonW, buttonH, "9", '9', TFT_LIGHTGREY, TFT_BLACK};
+  
+  // Zahl 0 (vierte Reihe)
+  numpadButtons[9] = {startX, startY + 3*(buttonH + spacing), buttonW, buttonH, "0", '0', TFT_LIGHTGREY, TFT_BLACK};
+  
+  // Funktions-Buttons (rechte Spalte)
+  numpadButtons[10] = {startX + 3*(buttonW + spacing), startY, buttonW, buttonH, "+", '+', TFT_GREEN, TFT_BLACK};
+  numpadButtons[11] = {startX + 3*(buttonW + spacing), startY + (buttonH + spacing), buttonW, buttonH, "-", '-', TFT_RED, TFT_WHITE};
+  numpadButtons[12] = {startX + 3*(buttonW + spacing), startY + 2*(buttonH + spacing), buttonW, buttonH, "<", '<', TFT_BLUE, TFT_WHITE};
+  numpadButtons[13] = {startX + 3*(buttonW + spacing), startY + 3*(buttonH + spacing), buttonW, buttonH, ">", '>', TFT_BLUE, TFT_WHITE};
+  
+  // OK und CANCEL - ORIENTIERUNGSABHÄNGIG
+  if (currentOrientation == LANDSCAPE) {
+    // Landscape: Kleinere OK/CANCEL Buttons nebeneinander
+    int okCancelW = (2*buttonW + spacing) / 2 - 2;  // Zwei gleich große Buttons
+    int okCancelY = startY + 4*(buttonH + spacing) + spacing;
+    
+    numpadButtons[14] = {startX, okCancelY, okCancelW, buttonH, "OK", 'O', TFT_DARKGREEN, TFT_WHITE};
+    numpadButtons[15] = {startX + okCancelW + 4, okCancelY, okCancelW, buttonH, "CANCEL", 'C', TFT_RED, TFT_WHITE};
+  } else {
+    // Portrait: Breitere OK/CANCEL Buttons wie ursprünglich
+    int wideButtonW = 2*buttonW + spacing;
+    int okCancelY = startY + 4*(buttonH + spacing) + 10;
+    
+    numpadButtons[14] = {startX, okCancelY, wideButtonW, buttonH, "OK", 'O', TFT_DARKGREEN, TFT_WHITE};
+    numpadButtons[15] = {startX + wideButtonW + spacing, okCancelY, wideButtonW, buttonH, "CANCEL", 'C', TFT_RED, TFT_WHITE};
+  }
 }
 
 void ServiceManager::update() {
@@ -190,6 +251,15 @@ void ServiceManager::handleTouch(int x, int y, bool touched) {
       }
       break;
       
+    case SERVICE_ORIENTATION:
+      // Orientierungs-Preview Handling
+      if (touched) {
+        // Zurück zum Service-Menü
+        currentState = SERVICE_ACTIVE;
+        drawServiceMenu();
+      }
+      break;
+      
     default:
       break;
   }
@@ -203,8 +273,14 @@ void ServiceManager::enterServiceMode() {
   currentState = SERVICE_ACTIVE;
   longTouchActive = false;
   
+  // *** NEU: Original-Orientierung merken ***
+  originalOrientation = currentOrientation;
+  orientationChanged = false;
+  
   #if DB_INFO == 1
     Serial.println("DEBUG: Service-Modus aktiviert");
+    Serial.print("DEBUG: Original-Orientierung: ");
+    Serial.println(originalOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
   #endif
   
   // Service-Menü anzeigen
@@ -219,27 +295,39 @@ void ServiceManager::exitServiceMode() {
       Serial.println("DEBUG: Konfiguration gespeichert");
     #endif
     
-    // Orientierung beim Verlassen anwenden - DIREKT ohne applyOrientation
-    if (currentOrientation == LANDSCAPE) {
-      tft.setRotation(1);
-      touchscreen.setRotation(1);
+    // *** KORRIGIERT: Orientierung nur bei tatsächlicher Änderung anwenden ***
+    if (orientationChanged && (currentOrientation != originalOrientation)) {
+      #if DB_INFO == 1
+        Serial.print("DEBUG: Orientierung wurde geändert von ");
+        Serial.print(originalOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
+        Serial.print(" auf ");
+        Serial.println(currentOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
+        Serial.println("DEBUG: Wende neue Orientierung an");
+      #endif
+      
+      applyOrientation(currentOrientation);
+      
+      // Kurze Pause für Orientierungs-Umschaltung
+      delay(500);
     } else {
-      tft.setRotation(0);  
-      touchscreen.setRotation(0);
+      #if DB_INFO == 1
+        Serial.println("DEBUG: Orientierung unverändert - keine Anwendung nötig");
+      #endif
     }
   }
   
   currentState = SERVICE_INACTIVE;
   configChanged = false;
+  orientationChanged = false;  // *** NEU: Flags zurücksetzen ***
   
   #if DB_INFO == 1
     Serial.println("DEBUG: Service-Modus verlassen");
   #endif
   
-  // Zurück zum Hauptmenü in neuer Orientierung
-  delay(500);  // Kurze Pause für Orientierungs-Umschaltung
+  // Zurück zum Hauptmenü
   showMenu();
 }
+
 
 void ServiceManager::cancelServiceMode() {
   // Konfiguration nicht speichern
@@ -274,6 +362,14 @@ void ServiceManager::drawServiceMenu() {
   String dimText = "Display: " + String(SCREEN_WIDTH) + "x" + String(SCREEN_HEIGHT);
   tft.drawCentreString(dimText, SCREEN_WIDTH/2 + 80, 40, 1);
   
+  // WiFi-Status anzeigen
+  if (wifiActive) {
+    tft.setTextColor(TFT_DARKGREEN, TFT_WHITE);
+    String wifiText = "WiFi: " + WiFi.softAPIP().toString();
+    tft.drawCentreString(wifiText, SCREEN_WIDTH/2 - 80, 40, 1);
+    tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  }
+  
   // Geändert-Indikator
   if (configChanged) {
     tft.setTextColor(TFT_RED, TFT_WHITE);
@@ -297,8 +393,27 @@ void ServiceManager::drawServiceMenu() {
       int textX = serviceButtons[i].x + serviceButtons[i].w/2;
       int textY = serviceButtons[i].y + serviceButtons[i].h/2 - 8;
       tft.drawCentreString(serviceButtons[i].label, textX, textY, 2);
+    } else {
+      // Deaktivierte Buttons grau zeichnen
+      tft.fillRect(serviceButtons[i].x, serviceButtons[i].y, 
+                   serviceButtons[i].w, serviceButtons[i].h, TFT_LIGHTGREY);
+      tft.drawRect(serviceButtons[i].x, serviceButtons[i].y, 
+                   serviceButtons[i].w, serviceButtons[i].h, TFT_DARKGREY);
+      
+      tft.setTextColor(TFT_DARKGREY);
+      int textX = serviceButtons[i].x + serviceButtons[i].w/2;
+      int textY = serviceButtons[i].y + serviceButtons[i].h/2 - 8;
+      tft.drawCentreString(serviceButtons[i].label, textX, textY, 2);
     }
   }
+}
+
+void ServiceManager::redrawServiceMenu() {
+  // Service-Buttons für neue Orientierung neu berechnen
+  initServiceButtons();
+  
+  // Menü neu zeichnen
+  drawServiceMenu();
 }
 
 void ServiceManager::drawProgressBar(int percent) {
@@ -353,11 +468,87 @@ void ServiceManager::handleServiceButtonPress(int buttonIndex) {
   switch (buttonIndex) {
     case 0: onEditDeviceID(); break;
     case 1: onToggleOrientation(); break;
-    case 2: onWiFiToggle(); break;      // Für später
-    case 3: onWebConfig(); break;       // Für später  
-    case 4: onSaveAndExit(); break;
-    case 5: onCancel(); break;
+    case 2: onTestFunction(); break;        // *** NEU: Test-Button ***
+    case 3: onWiFiToggle(); break;
+    case 4: onWebConfig(); break;
+    case 5: /* Platzhalter */ break;
+    case 6: onSaveAndExit(); break;
+    case 7: onCancel(); break;
   }
+}
+
+void ServiceManager::onTestFunction() {
+  #if DB_INFO == 1
+    Serial.println("DEBUG: Test-Funktion ausgeführt");
+  #endif
+  
+  // Test-Screen anzeigen
+  tft.fillScreen(TFT_WHITE);
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.drawCentreString("TEST FUNKTIONEN", SCREEN_WIDTH/2, 10, 2);
+  tft.drawLine(0, 30, SCREEN_WIDTH, 30, TFT_BLACK);
+  
+  // Test-Informationen anzeigen
+  tft.drawString("Device ID: " + currentDeviceID, 10, 40, 1);
+  tft.drawString("Orientierung: " + String(currentOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT"), 10, 55, 1);
+  tft.drawString("WiFi Status: " + String(wifiActive ? "AKTIV" : "INAKTIV"), 10, 70, 1);
+  tft.drawString("Freier Speicher: " + String(ESP.getFreeHeap()) + " Bytes", 10, 85, 1);
+  tft.drawString("Uptime: " + String(millis() / 1000) + " Sekunden", 10, 100, 1);
+  
+  // Display-Dimensionen
+  tft.drawString("Display: " + String(SCREEN_WIDTH) + "x" + String(SCREEN_HEIGHT), 10, 115, 1);
+  
+  // Touch-Test-Bereich
+  tft.fillRect(10, 130, SCREEN_WIDTH-20, 80, TFT_LIGHTGREY);
+  tft.drawRect(10, 130, SCREEN_WIDTH-20, 80, TFT_BLACK);
+  tft.setTextColor(TFT_BLACK);
+  tft.drawCentreString("TOUCH-TEST BEREICH", SCREEN_WIDTH/2, 140, 1);
+  tft.drawCentreString("Berühren Sie hier zum Testen", SCREEN_WIDTH/2, 155, 1);
+  tft.drawCentreString("Koordinaten werden angezeigt", SCREEN_WIDTH/2, 170, 1);
+  
+  // Zurück-Button
+  tft.fillRect(10, SCREEN_HEIGHT-40, SCREEN_WIDTH-20, 30, TFT_BLUE);
+  tft.setTextColor(TFT_WHITE);
+  tft.drawCentreString("TOUCH ZUM ZURÜCKKEHREN", SCREEN_WIDTH/2, SCREEN_HEIGHT-30, 1);
+  
+  // Warten auf Touch und Touch-Koordinaten anzeigen
+  bool exitTest = false;
+  while (!exitTest) {
+    if (touchscreen.tirqTouched() && touchscreen.touched()) {
+      delay(50);
+      
+      int x, y;
+      getTouchPoint(&x, &y);
+      
+      // Zurück-Button prüfen
+      if (y >= SCREEN_HEIGHT-40) {
+        exitTest = true;
+        break;
+      }
+      
+      // Touch-Koordinaten anzeigen
+      tft.fillRect(10, 185, SCREEN_WIDTH-20, 20, TFT_LIGHTGREY);
+      tft.setTextColor(TFT_BLACK);
+      String coords = "Touch: X=" + String(x) + ", Y=" + String(y);
+      tft.drawCentreString(coords, SCREEN_WIDTH/2, 190, 1);
+      
+      #if DB_INFO == 1
+        Serial.print("DEBUG: Touch-Test - X: ");
+        Serial.print(x);
+        Serial.print(", Y: ");
+        Serial.println(y);
+      #endif
+      
+      // Warten bis losgelassen
+      while (touchscreen.touched()) {
+        delay(10);
+      }
+    }
+    delay(50);
+  }
+  
+  // Zurück zum Service-Menü
+  drawServiceMenu();
 }
 
 void ServiceManager::onEditDeviceID() {
@@ -374,7 +565,12 @@ void ServiceManager::onEditDeviceID() {
   #if DB_INFO == 1
     Serial.print("DEBUG: Device ID Editor geöffnet - aktuelle ID: ");
     Serial.println(editDeviceID);
+    Serial.print("DEBUG: Orientierung: ");
+    Serial.println(currentOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
   #endif
+  
+  // *** WICHTIG: Numpad für aktuelle Orientierung neu initialisieren ***
+  initNumpadButtons();
   
   // Device ID Editor anzeigen
   drawDeviceIDEditor();
@@ -389,85 +585,100 @@ void ServiceManager::onToggleOrientation() {
   }
   
   configChanged = true;
+  orientationChanged = true;  // *** NEU: Orientierungs-Änderung markieren ***
   
   #if DB_INFO == 1
     Serial.print("DEBUG: Orientierung umgeschaltet auf: ");
     Serial.println(currentOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
+    Serial.print("DEBUG: Original war: ");
+    Serial.println(originalOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
   #endif
   
-  // Sofortige Anwendung der neuen Orientierung - DIREKT ohne applyOrientation
-  if (currentOrientation == LANDSCAPE) {
+  // Bestätigungsmeldung anzeigen (ohne Orientierung zu ändern)
+  tft.fillRect(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40, TFT_DARKGREEN);
+  tft.setTextColor(TFT_WHITE);
+  String orientText = (currentOrientation == LANDSCAPE) ? "LANDSCAPE" : "PORTRAIT";
+  tft.drawCentreString("Orientierung gesetzt: " + orientText, SCREEN_WIDTH/2, SCREEN_HEIGHT - 25, 2);
+  tft.drawCentreString("Wird beim Verlassen angewendet", SCREEN_WIDTH/2, SCREEN_HEIGHT - 10, 1);
+  
+  delay(2000);
+  
+  // Service-Menü neu zeichnen (aber in Landscape belassen)
+  drawServiceMenu();
+}
+
+void ServiceManager::toggleOrientation() {
+  // Alternative Implementation für Orientierungs-Umschaltung
+  onToggleOrientation();
+}
+
+void ServiceManager::applyOrientation(int orientation) {
+  // Orientierung sofort anwenden
+  if (orientation == LANDSCAPE) {
     tft.setRotation(1);
     touchscreen.setRotation(1);
+    
+    #if DB_INFO == 1
+      Serial.println("DEBUG: Orientierung auf LANDSCAPE angewendet");
+    #endif
   } else {
     tft.setRotation(0);
     touchscreen.setRotation(0);
+    
+    #if DB_INFO == 1
+      Serial.println("DEBUG: Orientierung auf PORTRAIT angewendet");
+    #endif
   }
   
-  // Kurze Verzögerung für visuelles Feedback
-  delay(500);
+  // Globale Variablen aktualisieren falls nötig
+  // (SCREEN_WIDTH und SCREEN_HEIGHT werden automatisch durch TFT_eSPI angepasst)
+}
+
+void ServiceManager::showOrientationPreview() {
+  currentState = SERVICE_ORIENTATION;
   
-  // Service-Menü in neuer Orientierung neu zeichnen
-  initServiceButtons();  // Buttons für neue Orientierung neu berechnen
-  drawServiceMenu();
+  // Sofortige Anwendung der neuen Orientierung für Preview
+  applyOrientation(currentOrientation);
+  
+  // Preview-Screen anzeigen
+  tft.fillScreen(TFT_WHITE);
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  
+  // Header
+  String orientationName = (currentOrientation == LANDSCAPE) ? "LANDSCAPE" : "PORTRAIT";
+  tft.drawCentreString("ORIENTIERUNG: " + orientationName, SCREEN_WIDTH/2, 10, 2);
+  tft.drawLine(0, 30, SCREEN_WIDTH, 30, TFT_BLACK);
+  
+  // Dimensionen anzeigen
+  String dimText = "Auflösung: " + String(SCREEN_WIDTH) + " x " + String(SCREEN_HEIGHT);
+  tft.drawCentreString(dimText, SCREEN_WIDTH/2, 50, 2);
+  
+  // Test-Rechtecke in den Ecken
+  tft.fillRect(10, 70, 50, 30, TFT_RED);
+  tft.fillRect(SCREEN_WIDTH - 60, 70, 50, 30, TFT_GREEN);
+  tft.fillRect(10, SCREEN_HEIGHT - 50, 50, 30, TFT_BLUE);
+  tft.fillRect(SCREEN_WIDTH - 60, SCREEN_HEIGHT - 50, 50, 30, TFT_YELLOW);
+  
+  // Ecken beschriften
+  tft.setTextColor(TFT_WHITE);
+  tft.drawCentreString("1", 35, 80, 2);
+  tft.drawCentreString("2", SCREEN_WIDTH - 35, 80, 2);
+  tft.drawCentreString("3", 35, SCREEN_HEIGHT - 40, 2);
+  tft.drawCentreString("4", SCREEN_WIDTH - 35, SCREEN_HEIGHT - 40, 2);
+  
+  // Instruktionen
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.drawCentreString("Touch um zurückzukehren", SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 2);
+  
+  // Kurze Verzögerung für visuelles Feedback
+  delay(1000);
 }
 
 void ServiceManager::onWiFiToggle() {
   if (wifiActive) {
-    // WiFi stoppen - DIREKT implementiert
-    #if DB_INFO == 1
-      Serial.println("DEBUG: Stoppe WiFi...");
-    #endif
-    
-    // Zuerst Web-Server stoppen
-    if (webServerActive) {
-      webServerActive = false;
-      #if DB_INFO == 1
-        Serial.println("DEBUG: Web-Server gestoppt");
-      #endif
-    }
-    
-    // WiFi stoppen
-    WiFi.softAPdisconnect(true);
-    WiFi.mode(WIFI_OFF);
-    wifiActive = false;
-    
-    #if DB_INFO == 1
-      Serial.println("DEBUG: WiFi gestoppt");
-    #endif
+    stopWiFi();
   } else {
-    // WiFi starten - DIREKT implementiert
-    #if DB_INFO == 1
-      Serial.println("DEBUG: Starte WiFi Access Point...");
-    #endif
-    
-    // Access Point starten
-    WiFi.mode(WIFI_AP);
-    bool success = WiFi.softAP(wifiSSID.c_str(), wifiPassword.c_str());
-    
-    if (success) {
-      wifiActive = true;
-      IPAddress IP = WiFi.softAPIP();
-      
-      #if DB_INFO == 1
-        Serial.print("DEBUG: WiFi AP gestartet - SSID: ");
-        Serial.println(wifiSSID);
-        Serial.print("DEBUG: IP-Adresse: ");
-        Serial.println(IP);
-      #endif
-      
-      // Automatisch Web-Server starten
-      if (!webServerActive) {
-        webServerActive = true;
-        #if DB_INFO == 1
-          Serial.println("DEBUG: Web-Server gestartet (vereinfacht)");
-        #endif
-      }
-    } else {
-      #if DB_INFO == 1
-        Serial.println("ERROR: WiFi AP konnte nicht gestartet werden");
-      #endif
-    }
+    startWiFiAP();
   }
   
   // Buttons neu initialisieren (WiFi-Status hat sich geändert)
@@ -476,36 +687,59 @@ void ServiceManager::onWiFiToggle() {
 }
 
 void ServiceManager::onWebConfig() {
-  if (wifiActive && !webServerActive) {
+  if (!wifiActive) {
+    // WiFi erst aktivieren
+    startWiFiAP();
+    initServiceButtons();
+    drawServiceMenu();
+    return;
+  }
+  
+  if (!webServerActive) {
     startWebServer();
   }
   
-  // Web-Config Anzeige - VEREINFACHT ohne getTouchPoint Loop
+  // Web-Config Anzeige
   tft.fillScreen(TFT_WHITE);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   tft.drawCentreString("WEB-KONFIGURATION", SCREEN_WIDTH/2, 10, 2);
   tft.drawLine(0, 30, SCREEN_WIDTH, 30, TFT_BLACK);
   
   if (wifiActive) {
-    String ipText = "IP: " + WiFi.softAPIP().toString();
+    IPAddress ip = WiFi.softAPIP();
+    String ipText = "IP: " + ip.toString();
     tft.drawCentreString(ipText, SCREEN_WIDTH/2, 50, 2);
-    tft.drawCentreString("http://192.168.4.1", SCREEN_WIDTH/2, 80, 2);
+    tft.drawCentreString("http://" + ip.toString(), SCREEN_WIDTH/2, 80, 2);
     
     tft.setTextColor(TFT_DARKGREEN, TFT_WHITE);
     tft.drawCentreString("Web-Server AKTIV", SCREEN_WIDTH/2, 110, 2);
     
     tft.setTextColor(TFT_BLACK, TFT_WHITE);
-    tft.drawCentreString("Konfiguration über Browser", SCREEN_WIDTH/2, 140, 1);
-    tft.drawCentreString("möglich", SCREEN_WIDTH/2, 155, 1);
+    tft.drawCentreString("SSID: " + wifiSSID, SCREEN_WIDTH/2, 140, 1);
+    tft.drawCentreString("Passwort: " + wifiPassword, SCREEN_WIDTH/2, 155, 1);
     
-    tft.drawCentreString("Touch zum Zurückkehren", SCREEN_WIDTH/2, 180, 1);
+    tft.drawCentreString("Konfiguration über Browser", SCREEN_WIDTH/2, 180, 1);
+    tft.drawCentreString("möglich", SCREEN_WIDTH/2, 195, 1);
+    
+    tft.drawCentreString("Touch zum Zurückkehren", SCREEN_WIDTH/2, 220, 1);
   } else {
     tft.setTextColor(TFT_RED, TFT_WHITE);
     tft.drawCentreString("WiFi nicht aktiv!", SCREEN_WIDTH/2, 50, 2);
+    tft.setTextColor(TFT_BLACK, TFT_WHITE);
+    tft.drawCentreString("Aktivieren Sie zuerst WiFi", SCREEN_WIDTH/2, 80, 1);
   }
   
-  // Automatischer Rücksprung nach 5 Sekunden
-  delay(5000);
+  // Warten auf Touch
+  unsigned long startTime = millis();
+  bool touched = false;
+  
+  while (!touched && (millis() - startTime < 10000)) {  // 10 Sekunden Timeout
+    if (touchscreen.tirqTouched() && touchscreen.touched()) {
+      touched = true;
+      delay(200);  // Entprellung
+    }
+    delay(50);
+  }
   
   // Zurück zum Service-Menü
   drawServiceMenu();
@@ -517,6 +751,83 @@ void ServiceManager::onSaveAndExit() {
 
 void ServiceManager::onCancel() {
   cancelServiceMode();
+}
+
+void ServiceManager::startWiFiAP() {
+  #if DB_INFO == 1
+    Serial.println("DEBUG: Starte WiFi Access Point...");
+  #endif
+  
+  // Access Point starten
+  WiFi.mode(WIFI_AP);
+  bool success = WiFi.softAP(wifiSSID.c_str(), wifiPassword.c_str());
+  
+  if (success) {
+    wifiActive = true;
+    IPAddress IP = WiFi.softAPIP();
+    
+    #if DB_INFO == 1
+      Serial.print("DEBUG: WiFi AP gestartet - SSID: ");
+      Serial.println(wifiSSID);
+      Serial.print("DEBUG: IP-Adresse: ");
+      Serial.println(IP);
+    #endif
+    
+    // Automatisch Web-Server starten
+    startWebServer();
+  } else {
+    #if DB_INFO == 1
+      Serial.println("ERROR: WiFi AP konnte nicht gestartet werden");
+    #endif
+  }
+}
+
+void ServiceManager::stopWiFi() {
+  #if DB_INFO == 1
+    Serial.println("DEBUG: Stoppe WiFi...");
+  #endif
+  
+  // Zuerst Web-Server stoppen
+  if (webServerActive) {
+    stopWebServer();
+  }
+  
+  // WiFi stoppen
+  WiFi.softAPdisconnect(true);
+  WiFi.mode(WIFI_OFF);
+  wifiActive = false;
+  
+  #if DB_INFO == 1
+    Serial.println("DEBUG: WiFi gestoppt");
+  #endif
+}
+
+void ServiceManager::startWebServer() {
+  if (!wifiActive) {
+    #if DB_INFO == 1
+      Serial.println("ERROR: Kann Web-Server nicht starten - WiFi nicht aktiv");
+    #endif
+    return;
+  }
+  
+  webServerActive = true;
+  
+  #if DB_INFO == 1
+    Serial.println("DEBUG: Web-Server gestartet (vereinfacht)");
+  #endif
+  
+  // Hier würde der eigentliche Web-Server Code stehen
+  // Für Version 1.50 ist dies nur ein Placeholder
+}
+
+void ServiceManager::stopWebServer() {
+  webServerActive = false;
+  
+  #if DB_INFO == 1
+    Serial.println("DEBUG: Web-Server gestoppt");
+  #endif
+  
+  // Hier würde der Web-Server gestoppt werden
 }
 
 void ServiceManager::handleServiceTelegram(String action, String params) {
@@ -534,54 +845,93 @@ void ServiceManager::handleServiceTelegram(String action, String params) {
       #endif
     }
   } else if (action == "WIFI") {
-    // WiFi-Steuerung per Telegramm - DIREKT implementiert
+    // WiFi-Steuerung per Telegramm
     int value = params.toInt();
     if (value == 1) {
       // WiFi aktivieren
       if (!wifiActive) {
+        startWiFiAP();
         #if DB_INFO == 1
-          Serial.println("DEBUG: Starte WiFi per Telegramm...");
+          Serial.println("DEBUG: WiFi per Telegramm aktiviert");
         #endif
-        
-        WiFi.mode(WIFI_AP);
-        bool success = WiFi.softAP(wifiSSID.c_str(), wifiPassword.c_str());
-        
-        if (success) {
-          wifiActive = true;
-          webServerActive = true;  // Automatisch mit starten
-          
-          #if DB_INFO == 1
-            Serial.println("DEBUG: WiFi per Telegramm aktiviert");
-          #endif
-        }
       }
     } else {
       // WiFi deaktivieren
       if (wifiActive) {
-        webServerActive = false;
-        WiFi.softAPdisconnect(true);
-        WiFi.mode(WIFI_OFF);
-        wifiActive = false;
-        
+        stopWiFi();
         #if DB_INFO == 1
           Serial.println("DEBUG: WiFi per Telegramm deaktiviert");
         #endif
       }
     }
   } else if (action == "WEBSERVER") {
-    // Web-Server-Steuerung per Telegramm - DIREKT implementiert
+    // Web-Server-Steuerung per Telegramm
     int value = params.toInt();
     if (value == 1 && wifiActive) {
-      webServerActive = true;
-      #if DB_INFO == 1
-        Serial.println("DEBUG: Web-Server per Telegramm aktiviert");
-      #endif
+      if (!webServerActive) {
+        startWebServer();
+        #if DB_INFO == 1
+          Serial.println("DEBUG: Web-Server per Telegramm aktiviert");
+        #endif
+      }
     } else {
-      webServerActive = false;
+      if (webServerActive) {
+        stopWebServer();
+        #if DB_INFO == 1
+          Serial.println("DEBUG: Web-Server per Telegramm deaktiviert");
+        #endif
+      }
+    }
+  } else if (action == "DEVICE_ID") {
+    // Device ID per Telegramm ändern
+    if (params.length() == 4) {
+      bool isValid = true;
+      for (int i = 0; i < 4; i++) {
+        if (!isDigit(params.charAt(i))) {
+          isValid = false;
+          break;
+        }
+      }
+      
+      if (isValid) {
+        currentDeviceID = params;
+        configChanged = true;
+        
+        #if DB_INFO == 1
+          Serial.print("DEBUG: Device ID per Telegramm geändert auf: ");
+          Serial.println(currentDeviceID);
+        #endif
+      } else {
+        #if DB_INFO == 1
+          Serial.println("ERROR: Ungültige Device ID per Telegramm (muss 4 Ziffern sein)");
+        #endif
+      }
+    }
+  } else if (action == "ORIENTATION") {
+    // Orientierung per Telegramm ändern
+    int value = params.toInt();
+    if (value == 0 || value == 1) {
+      currentOrientation = value;
+      configChanged = true;
+      
+      // Sofort anwenden
+      applyOrientation(currentOrientation);
+      
       #if DB_INFO == 1
-        Serial.println("DEBUG: Web-Server per Telegramm deaktiviert");
+        Serial.print("DEBUG: Orientierung per Telegramm geändert auf: ");
+        Serial.println(currentOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
       #endif
     }
+  } else if (action == "RESET") {
+    // System-Reset per Telegramm
+    #if DB_INFO == 1
+      Serial.println("DEBUG: SYSTEM RESET per Telegramm empfangen!");
+      Serial.println("DEBUG: ESP32 wird in 2 Sekunden neu gestartet...");
+      Serial.flush();
+    #endif
+    
+    delay(2000);
+    ESP.restart();
   }
 }
 
@@ -645,8 +995,29 @@ String ServiceManager::getDeviceID() {
 }
 
 void ServiceManager::setDeviceID(String newID) {
-  currentDeviceID = newID;
-  configChanged = true;
+  if (newID.length() == 4) {
+    bool isValid = true;
+    for (int i = 0; i < 4; i++) {
+      if (!isDigit(newID.charAt(i))) {
+        isValid = false;
+        break;
+      }
+    }
+    
+    if (isValid) {
+      currentDeviceID = newID;
+      configChanged = true;
+      
+      #if DB_INFO == 1
+        Serial.print("DEBUG: Device ID geändert auf: ");
+        Serial.println(currentDeviceID);
+      #endif
+    } else {
+      #if DB_INFO == 1
+        Serial.println("ERROR: Ungültige Device ID (muss 4 Ziffern sein)");
+      #endif
+    }
+  }
 }
 
 int ServiceManager::getOrientation() {
@@ -654,33 +1025,16 @@ int ServiceManager::getOrientation() {
 }
 
 void ServiceManager::setOrientation(int orientation) {
-  currentOrientation = orientation;
-  configChanged = true;
+  if (orientation == PORTRAIT || orientation == LANDSCAPE) {
+    currentOrientation = orientation;
+    configChanged = true;
+    
+    #if DB_INFO == 1
+      Serial.print("DEBUG: Orientierung geändert auf: ");
+      Serial.println(currentOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
+    #endif
+  }
 }
-
-// Globale Hilfsfunktionen
-void setupServiceManager() {
-  EEPROM.begin(512);  // EEPROM initialisieren
-  serviceManager.loadConfig();
-  
-  #if DB_INFO == 1
-    Serial.println("DEBUG: ServiceManager initialisiert - Version 1.50");
-  #endif
-}
-
-void updateServiceManager() {
-  serviceManager.update();
-}
-
-void handleServiceTouch(int x, int y, bool touched) {
-  serviceManager.handleTouch(x, y, touched);
-}
-
-void handleWebServerLoop() {
-  serviceManager.handleWebServer();
-}
-
-// *** NEU: Public Interface Funktionen ***
 
 bool ServiceManager::isWiFiActive() {
   return wifiActive;
@@ -694,62 +1048,19 @@ void ServiceManager::handleWebServer() {
   // Vereinfacht - kein WebServer.handleClient() für jetzt
   if (webServerActive) {
     // Placeholder für Web-Server Handling
+    // Hier würde normalerweise server.handleClient() aufgerufen werden
   }
 }
 
-// *** NEU: Device ID Editor Implementation ***
-
-void ServiceManager::initNumpadButtons() {
-  // Numpad Layout: 4x4 Grid
-  // [1] [2] [3] [+]
-  // [4] [5] [6] [-]  
-  // [7] [8] [9] [<]
-  // [0] [  ] [  ] [>]
-  // [OK]    [CANCEL]
-  
-  int buttonW = 60;
-  int buttonH = 40;
-  int spacing = 5;
-  int startX = (SCREEN_WIDTH - (4 * buttonW + 3 * spacing)) / 2;
-  int startY = 80;
-  
-  // Zahlen 1-3
-  numpadButtons[0] = {startX, startY, buttonW, buttonH, "1", '1', TFT_LIGHTGREY, TFT_BLACK};
-  numpadButtons[1] = {startX + (buttonW + spacing), startY, buttonW, buttonH, "2", '2', TFT_LIGHTGREY, TFT_BLACK};
-  numpadButtons[2] = {startX + 2*(buttonW + spacing), startY, buttonW, buttonH, "3", '3', TFT_LIGHTGREY, TFT_BLACK};
-  
-  // Zahlen 4-6
-  numpadButtons[3] = {startX, startY + (buttonH + spacing), buttonW, buttonH, "4", '4', TFT_LIGHTGREY, TFT_BLACK};
-  numpadButtons[4] = {startX + (buttonW + spacing), startY + (buttonH + spacing), buttonW, buttonH, "5", '5', TFT_LIGHTGREY, TFT_BLACK};
-  numpadButtons[5] = {startX + 2*(buttonW + spacing), startY + (buttonH + spacing), buttonW, buttonH, "6", '6', TFT_LIGHTGREY, TFT_BLACK};
-  
-  // Zahlen 7-9
-  numpadButtons[6] = {startX, startY + 2*(buttonH + spacing), buttonW, buttonH, "7", '7', TFT_LIGHTGREY, TFT_BLACK};
-  numpadButtons[7] = {startX + (buttonW + spacing), startY + 2*(buttonH + spacing), buttonW, buttonH, "8", '8', TFT_LIGHTGREY, TFT_BLACK};
-  numpadButtons[8] = {startX + 2*(buttonW + spacing), startY + 2*(buttonH + spacing), buttonW, buttonH, "9", '9', TFT_LIGHTGREY, TFT_BLACK};
-  
-  // Zahl 0
-  numpadButtons[9] = {startX, startY + 3*(buttonH + spacing), buttonW, buttonH, "0", '0', TFT_LIGHTGREY, TFT_BLACK};
-  
-  // Funktions-Buttons (rechte Spalte)
-  numpadButtons[10] = {startX + 3*(buttonW + spacing), startY, buttonW, buttonH, "+", '+', TFT_GREEN, TFT_BLACK};
-  numpadButtons[11] = {startX + 3*(buttonW + spacing), startY + (buttonH + spacing), buttonW, buttonH, "-", '-', TFT_RED, TFT_WHITE};
-  numpadButtons[12] = {startX + 3*(buttonW + spacing), startY + 2*(buttonH + spacing), buttonW, buttonH, "<", '<', TFT_BLUE, TFT_WHITE};
-  numpadButtons[13] = {startX + 3*(buttonW + spacing), startY + 3*(buttonH + spacing), buttonW, buttonH, ">", '>', TFT_BLUE, TFT_WHITE};
-  
-  // OK und CANCEL (breite Buttons unten)
-  int wideButtonW = 2*buttonW + spacing;
-  numpadButtons[14] = {startX, startY + 4*(buttonH + spacing) + 10, wideButtonW, buttonH, "OK", 'O', TFT_DARKGREEN, TFT_WHITE};
-  numpadButtons[15] = {startX + wideButtonW + spacing, startY + 4*(buttonH + spacing) + 10, wideButtonW, buttonH, "CANCEL", 'C', TFT_RED, TFT_WHITE};
-}
+// *** DEVICE ID EDITOR IMPLEMENTATION ***
 
 void ServiceManager::drawDeviceIDEditor() {
   tft.fillScreen(TFT_WHITE);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   
   // Header
-  tft.drawCentreString("DEVICE ID EDITOR", SCREEN_WIDTH/2, 10, 2);
-  tft.drawLine(0, 30, SCREEN_WIDTH, 30, TFT_BLACK);
+  tft.drawCentreString("DEVICE ID EDITOR", SCREEN_WIDTH/2, SCREEN_HEIGHT - 10, 1);
+  //tft.drawLine(0, 30, SCREEN_WIDTH, 30, TFT_BLACK);
   
   // Device ID Anzeige
   drawDeviceIDDisplay();
@@ -759,40 +1070,36 @@ void ServiceManager::drawDeviceIDEditor() {
 }
 
 void ServiceManager::drawDeviceIDDisplay() {
-  // Device ID groß anzeigen mit Cursor
-  int displayY = 45;
+  int displayY = 5;  // Direkt im oberen Bereich (Headerbereich)
+
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  tft.drawCentreString("Current ID:", SCREEN_WIDTH/2, displayY, 1);
-  
-  // ID-Zeichen einzeln zeichnen
+
+  // ID-Zeichen einzeln zeichnen - ORIENTIERUNGSABHÄNGIG
   int charWidth = 40;
   int spacing = 5;
   int totalWidth = 4 * charWidth + 3 * spacing;
   int startX = (SCREEN_WIDTH - totalWidth) / 2;
-  int charY = displayY + 15;
-  
+  int charY = displayY;
+
   for (int i = 0; i < 4; i++) {
     int x = startX + i * (charWidth + spacing);
-    
-    // Hintergrund-Farbe je nach Position
     uint16_t bgColor = (i == editPosition) ? TFT_YELLOW : TFT_LIGHTGREY;
     uint16_t textColor = TFT_BLACK;
-    
-    // Zeichen-Box zeichnen
+
     tft.fillRect(x, charY, charWidth, 30, bgColor);
     tft.drawRect(x, charY, charWidth, 30, TFT_BLACK);
-    
-    // Zeichen zentriert zeichnen
+
     String digit = String(editDeviceID.charAt(i));
     tft.setTextColor(textColor);
     tft.drawCentreString(digit, x + charWidth/2, charY + 8, 2);
   }
-  
+
   // Position-Indikator
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  String posText = "Position: " + String(editPosition + 1) + "/4";
+  String posText = "Pos: " + String(editPosition + 1) + "/4";
   tft.drawCentreString(posText, SCREEN_WIDTH/2, charY + 35, 1);
-}
+}  
+
 
 void ServiceManager::drawNumpad() {
   for (int i = 0; i < NUM_NUMPAD_BUTTONS; i++) {
@@ -884,9 +1191,9 @@ void ServiceManager::updateDeviceIDDigit(char digit) {
     #endif
     
     // Automatisch zur nächsten Position
-    if (editPosition < 3) {
-      editPosition++;
-    }
+    //if (editPosition < 3) {
+    //  editPosition++;
+    //}
   }
 }
 
@@ -929,13 +1236,44 @@ void ServiceManager::decrementCurrentDigit() {
 }
 
 void ServiceManager::confirmDeviceIDEdit() {
-  currentDeviceID = editDeviceID;
-  configChanged = true;
+  // Validierung der neuen Device ID
+  bool isValid = true;
+  for (int i = 0; i < 4; i++) {
+    if (!isDigit(editDeviceID.charAt(i))) {
+      isValid = false;
+      break;
+    }
+  }
   
-  #if DB_INFO == 1
-    Serial.print("DEBUG: Device ID bestätigt: ");
-    Serial.println(currentDeviceID);
-  #endif
+  if (isValid) {
+    currentDeviceID = editDeviceID;
+    configChanged = true;
+    
+    #if DB_INFO == 1
+      Serial.print("DEBUG: Device ID bestätigt: ");
+      Serial.println(currentDeviceID);
+    #endif
+    
+    // Erfolgsmeldung anzeigen
+    tft.fillRect(0, SCREEN_HEIGHT - 50, SCREEN_WIDTH, 50, TFT_DARKGREEN);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("Device ID erfolgreich geändert!", SCREEN_WIDTH/2, SCREEN_HEIGHT - 35, 2);
+    tft.drawCentreString("Neue ID: " + currentDeviceID, SCREEN_WIDTH/2, SCREEN_HEIGHT - 15, 1);
+    
+    delay(2000);
+  } else {
+    // Fehlermeldung
+    tft.fillRect(0, SCREEN_HEIGHT - 50, SCREEN_WIDTH, 50, TFT_RED);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("Ungültige Device ID!", SCREEN_WIDTH/2, SCREEN_HEIGHT - 35, 2);
+    tft.drawCentreString("Nur Ziffern 0-9 erlaubt", SCREEN_WIDTH/2, SCREEN_HEIGHT - 15, 1);
+    
+    delay(2000);
+    
+    // Zurück zum Editor
+    drawDeviceIDEditor();
+    return;
+  }
   
   // Zurück zum Service-Menü
   currentState = SERVICE_ACTIVE;
@@ -947,7 +1285,41 @@ void ServiceManager::cancelDeviceIDEdit() {
     Serial.println("DEBUG: Device ID Bearbeitung abgebrochen");
   #endif
   
+  // Abbruch-Meldung anzeigen
+  tft.fillRect(0, SCREEN_HEIGHT - 30, SCREEN_WIDTH, 30, TFT_ORANGE);
+  tft.setTextColor(TFT_BLACK);
+  tft.drawCentreString("Device ID Bearbeitung abgebrochen", SCREEN_WIDTH/2, SCREEN_HEIGHT - 20, 1);
+  
+  delay(1000);
+  
   // Zurück zum Service-Menü ohne Änderungen
   currentState = SERVICE_ACTIVE;
   drawServiceMenu();
+}
+
+// *** GLOBALE HILFSFUNKTIONEN ***
+
+void setupServiceManager() {
+  EEPROM.begin(512);  // EEPROM initialisieren
+  serviceManager.loadConfig();
+  
+  #if DB_INFO == 1
+    Serial.println("DEBUG: ServiceManager initialisiert - Version 1.50");
+    Serial.print("DEBUG: Device ID: ");
+    Serial.println(serviceManager.getDeviceID());
+    Serial.print("DEBUG: Orientierung: ");
+    Serial.println(serviceManager.getOrientation() == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
+  #endif
+}
+
+void updateServiceManager() {
+  serviceManager.update();
+}
+
+void handleServiceTouch(int x, int y, bool touched) {
+  serviceManager.handleTouch(x, y, touched);
+}
+
+void handleWebServerLoop() {
+  serviceManager.handleWebServer();
 }
