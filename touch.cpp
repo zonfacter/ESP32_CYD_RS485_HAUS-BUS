@@ -28,51 +28,49 @@ void setupTouch() {
 void getTouchPoint(int *x, int *y) {
   TS_Point p = touchscreen.getPoint();
   
-  // XY-Achsen sind bei diesem Display vertauscht und möglicherweise gespiegelt
-  // Konfigurierbare Werte für XPT2046 mit ST7789 im Querformat
-  #if SCREEN_ORIENTATION == LANDSCAPE
+  // *** DYNAMISCHE ORIENTIERUNG statt #if SCREEN_ORIENTATION ***
+  int currentRotation = tft.getRotation();  // 0=Portrait, 1=Landscape
+  
+  if (currentRotation == 1) {  // LANDSCAPE
     // Für Querformat: XY-Achsen tauschen und X spiegeln wenn nötig
     if (invertTouchX) {
-      *x = map(p.y, TOUCH_MIN_Y, TOUCH_MAX_Y, 0, SCREEN_WIDTH);
+      *x = map(p.y, TOUCH_MIN_Y, TOUCH_MAX_Y, 0, tft.width());
     } else {
-      *x = map(p.y, TOUCH_MAX_Y, TOUCH_MIN_Y, 0, SCREEN_WIDTH);
+      *x = map(p.y, TOUCH_MAX_Y, TOUCH_MIN_Y, 0, tft.width());
     }
     
     if (invertTouchY) {
-      *y = map(p.x, TOUCH_MIN_X, TOUCH_MAX_X, 0, SCREEN_HEIGHT);
+      *y = map(p.x, TOUCH_MIN_X, TOUCH_MAX_X, 0, tft.height());
     } else {
-      *y = map(p.x, TOUCH_MAX_X, TOUCH_MIN_X, 0, SCREEN_HEIGHT);
+      *y = map(p.x, TOUCH_MAX_X, TOUCH_MIN_X, 0, tft.height());
     }
-  #else
+  } else {  // PORTRAIT (currentRotation == 0)
     // Für Hochformat
     if (invertTouchX) {
-      *x = map(p.x, TOUCH_MIN_X, TOUCH_MAX_X, 0, SCREEN_WIDTH);
+      *x = map(p.x, TOUCH_MIN_X, TOUCH_MAX_X, 0, tft.width());
     } else {
-      *x = map(p.x, TOUCH_MAX_X, TOUCH_MIN_X, 0, SCREEN_WIDTH);
+      *x = map(p.x, TOUCH_MAX_X, TOUCH_MIN_X, 0, tft.width());
     }
     
     if (invertTouchY) {
-      *y = map(p.y, TOUCH_MIN_Y, TOUCH_MAX_Y, 0, SCREEN_HEIGHT);
+      *y = map(p.y, TOUCH_MIN_Y, TOUCH_MAX_Y, 0, tft.height());
     } else {
-      *y = map(p.y, TOUCH_MAX_Y, TOUCH_MIN_Y, 0, SCREEN_HEIGHT);
+      *y = map(p.y, TOUCH_MAX_Y, TOUCH_MIN_Y, 0, tft.height());
     }
-  #endif
+  }
   
   // Begrenzen auf gültigen Bereich
-  *x = constrain(*x, 0, SCREEN_WIDTH - 1);
-  *y = constrain(*y, 0, SCREEN_HEIGHT - 1);
+  *x = constrain(*x, 0, tft.width() - 1);
+  *y = constrain(*y, 0, tft.height() - 1);
   
-  // Protokollierung für Debugging-Zwecke
-  #if DB_INFO == 1  // Allgemeine Informationen
-  Serial.print("Raw: (");
-  Serial.print(p.x);
-  Serial.print(", ");
-  Serial.print(p.y);
-  Serial.print(") -> Mapped: (");
-  Serial.print(*x);
-  Serial.print(", ");
-  Serial.print(*y);
-  Serial.println(")");
+  #if DB_INFO == 1
+    Serial.print("Raw Touch: (");
+    Serial.print(p.x); Serial.print(", "); Serial.print(p.y);
+    Serial.print(") Rotation:"); Serial.print(currentRotation);
+    Serial.print(" -> Mapped: (");
+    Serial.print(*x); Serial.print(", "); Serial.print(*y);
+    Serial.print(") Display:"); Serial.print(tft.width());
+    Serial.print("x"); Serial.println(tft.height());
   #endif
 }
 
@@ -177,7 +175,8 @@ void testTouch() {
   while (testMode) {
     // Prüfen, ob ein Statusupdate für die Hintergrundbeleuchtung fällig ist
     unsigned long currentMillis = millis();
-    if (currentMillis - lastBacklightStatusTime >= BACKLIGHT_STATUS_INTERVAL) {
+    // *** KORRIGIERT: Konstante direkt verwenden ***
+    if (currentMillis - lastBacklightStatusTime >= 23000) {  // BACKLIGHT_STATUS_INTERVAL = 23000
       sendBacklightStatus();
       lastBacklightStatusTime = currentMillis;
     }

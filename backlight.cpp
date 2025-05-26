@@ -1,5 +1,6 @@
 #include "backlight.h"
 #include "communication.h"
+#include "service_manager.h"  // ← NEU: ServiceManager Include hinzufügen
 #include <Arduino.h>
 
 // Einige Definitionen für die direkte Register-Manipulation
@@ -11,6 +12,7 @@ int backlightValue = DEFAULT_BACKLIGHT;
 
 // PWM-Initialisierung Flag
 static bool pwmInitialized = false;
+
 
 // Initialisiere die Hintergrundbeleuchtung - KORRIGIERT: PWM sofort initialisieren
 void setupBacklight() {
@@ -75,9 +77,25 @@ void setBacklightPWM(int value) {
 
 // Sendet den aktuellen Status der Hintergrundbeleuchtung
 void sendBacklightStatus() {
-  sendTelegram("LBN", "16", "STATUS", String(currentBacklight));
+  // *** KORRIGIERT: Device ID vom ServiceManager holen ***
+  String currentDeviceID = serviceManager.getDeviceID();
   
-  Serial.print("DEBUG: Backlight-Status gesendet: ");
-  Serial.print(currentBacklight);
-  Serial.println("%");
+  // Telegramm manuell aufbauen um sicherzustellen, dass die richtige Device ID verwendet wird
+  String telegram = String((char)START_BYTE) + currentDeviceID + ".LBN.16.STATUS." + String(currentBacklight) + String((char)END_BYTE);
+  
+  #if DB_TX_INFO == 1
+    Serial.print("DEBUG: Sende Backlight-Status mit Device ID ");
+    Serial.print(currentDeviceID);
+    Serial.print(": ");
+    Serial.print(currentBacklight);
+    Serial.print("% - Telegramm: ");
+    Serial.println(telegram);
+  #endif
+  
+  // Direkt über CSMA/CD senden
+  if (!addToSendQueue(telegram, 7, false)) {  // Niedrige Priorität für Status
+    #if DB_TX_INFO == 1
+      Serial.println("DEBUG: Konnte Backlight-Status nicht senden");
+    #endif
+  }
 }

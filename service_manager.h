@@ -1,12 +1,13 @@
 /**
- * service_manager.h - Version 1.50
+ * service_manager.h - Version 1.60 - VOLLSTÄNDIGE VERSION
  * 
  * Service-Menü für ESP32 Touch-Interface
- * - 20-Sekunden Touch-Aktivierung
+ * - 20-Sekunden Touch-Aktivierung (entfernt - nur noch Icon-Touch)
  * - Device ID Konfiguration
  * - Orientierungs-Umschaltung
  * - Telegramm-Steuerung
  * - WiFi Access Point
+ * - Test-Funktion integriert
  */
 
 #ifndef SERVICE_MANAGER_H
@@ -49,7 +50,7 @@ private:
   unsigned long lastProgressUpdate;
   
   // Service-Menü Buttons
-  static const int NUM_SERVICE_BUTTONS = 6;
+  static const int NUM_SERVICE_BUTTONS = 8;  // ← 8 Buttons (inkl. Test)
   ServiceButton serviceButtons[NUM_SERVICE_BUTTONS];
   
   // Device ID Editor
@@ -61,7 +62,9 @@ private:
   // Aktuelle Konfiguration
   String currentDeviceID;
   int currentOrientation;
+  int originalOrientation;      // *** NEU: Original-Orientierung beim Service-Start ***
   bool configChanged;
+  bool orientationChanged;      // *** NEU: Flag für Orientierungs-Änderung ***
   
   // WiFi und Web-Interface
   bool wifiActive;
@@ -72,7 +75,7 @@ private:
   // Progress-Anzeige für 20-Sekunden-Touch
   int progressPercent;
   
-  // Private Hilfsfunktionen
+  // *** ALLE Private Hilfsfunktionen DEKLARIERT ***
   void initServiceButtons();
   void initNumpadButtons();
   
@@ -106,6 +109,7 @@ private:
   // Service-Button Callbacks (private)
   void onEditDeviceID();
   void onToggleOrientation();
+  void onTestFunction();                    // *** NEU: Test-Button ***
   void onSaveAndExit();
   void onCancel();
   void onWiFiToggle();
