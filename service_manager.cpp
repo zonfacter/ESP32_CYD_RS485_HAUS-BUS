@@ -55,9 +55,9 @@ ServiceManager::ServiceManager() {
 }
 
 void ServiceManager::initServiceButtons() {
-  // *** Service-Menü Layout ist IMMER Landscape + TEST-Button integriert ***
+  // *** Service-Menü Layout ist IMMER basierend auf aktueller Bildschirm-Größe ***
   
-  int buttonW = (SCREEN_WIDTH - 40) / 3;  // 3 Spalten für 7 Buttons
+  int buttonW = (SCREEN_WIDTH - 40) / 3;  // 3 Spalten
   int buttonH = 40;
   int spacing = 10;
   int startY = 60;
@@ -65,10 +65,16 @@ void ServiceManager::initServiceButtons() {
   // Erste Reihe: Device ID, Orientation, Test
   serviceButtons[0] = {10, startY, buttonW, buttonH, "Device ID", TFT_BLUE, TFT_WHITE, true};
   
-  String orientLabel = (currentOrientation == LANDSCAPE) ? "→ Portrait" : "→ Landscape";
+  // *** KORRIGIERT: Button-Label basierend auf gewählter (nicht aktueller) Orientierung ***
+  String orientLabel;
+  if (currentOrientation == LANDSCAPE) {
+    orientLabel = "→ Portrait";  // Wechseln zu Portrait
+  } else {
+    orientLabel = "→ Landscape"; // Wechseln zu Landscape  
+  }
   serviceButtons[1] = {20 + buttonW, startY, buttonW, buttonH, orientLabel, TFT_GREEN, TFT_BLACK, true};
   
-  // *** NEU: Test-Button integriert ***
+  // Test-Button
   serviceButtons[2] = {30 + 2*buttonW, startY, buttonW, buttonH, "TEST", TFT_BLUE, TFT_WHITE, true};
   
   // Zweite Reihe: WiFi, Web Config, (leer)
@@ -78,13 +84,22 @@ void ServiceManager::initServiceButtons() {
   
   serviceButtons[4] = {20 + buttonW, startY + buttonH + spacing, buttonW, buttonH, "Web Config", TFT_PURPLE, TFT_WHITE, wifiActive};
   
-  // Platzhalter für künftige Funktion
+  // Platzhalter
   serviceButtons[5] = {30 + 2*buttonW, startY + buttonH + spacing, buttonW, buttonH, "---", TFT_LIGHTGREY, TFT_DARKGREY, false};
   
-  // Dritte Reihe: Save & Exit, Cancel, (leer)
+  // Dritte Reihe: Save & Exit, Cancel
   serviceButtons[6] = {10, startY + 2*(buttonH + spacing), (2*buttonW + spacing), buttonH, "SAVE & EXIT", TFT_DARKGREEN, TFT_WHITE, true};
   
   serviceButtons[7] = {30 + 2*buttonW, startY + 2*(buttonH + spacing), buttonW, buttonH, "CANCEL", TFT_RED, TFT_WHITE, true};
+  
+  #if DB_INFO == 1
+    Serial.print("DEBUG: Service-Buttons initialisiert für ");
+    Serial.print(SCREEN_WIDTH);
+    Serial.print("x");
+    Serial.print(SCREEN_HEIGHT);
+    Serial.print(" - Button-Label: ");
+    Serial.println(orientLabel);
+  #endif
 }
 
 void ServiceManager::initNumpadButtons() {
@@ -275,13 +290,16 @@ void ServiceManager::enterServiceMode() {
   currentState = SERVICE_ACTIVE;
   longTouchActive = false;
   
-  // *** NEU: Original-Orientierung merken ***
-  originalOrientation = currentOrientation;
+  // *** KORRIGIERT: Original-Orientierung basierend auf aktueller TFT-Rotation setzen ***
+  int currentTftRotation = tft.getRotation();
+  originalOrientation = (currentTftRotation == 0 || currentTftRotation == 2) ? PORTRAIT : LANDSCAPE;
+  currentOrientation = originalOrientation;  // Aktuelle = Original beim Start
   orientationChanged = false;
   
   #if DB_INFO == 1
-    Serial.println("DEBUG: Service-Modus aktiviert");
-    Serial.print("DEBUG: Original-Orientierung: ");
+    Serial.print("DEBUG: Service-Modus aktiviert - TFT-Rotation: ");
+    Serial.print(currentTftRotation);
+    Serial.print(" → Original-Orientierung: ");
     Serial.println(originalOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
   #endif
   
@@ -300,16 +318,14 @@ void ServiceManager::exitServiceMode() {
     // *** KORRIGIERT: Orientierung nur bei tatsächlicher Änderung anwenden ***
     if (orientationChanged && (currentOrientation != originalOrientation)) {
       #if DB_INFO == 1
-        Serial.print("DEBUG: Orientierung wurde geändert von ");
-        Serial.print(originalOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
-        Serial.print(" auf ");
+        Serial.print("DEBUG: Orientierung wurde geändert - Wende neue Orientierung an: ");
         Serial.println(currentOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
-        Serial.println("DEBUG: Wende neue Orientierung an");
       #endif
       
-      applyOrientation(currentOrientation);
+      // *** SOFORTIGE Orientierungs-Anwendung ***
+      setOrientation(currentOrientation);
       
-      // Kurze Pause für Orientierungs-Umschaltung
+      // *** WICHTIG: Pause für UI-Stabilisierung ***
       delay(500);
     } else {
       #if DB_INFO == 1
@@ -320,13 +336,13 @@ void ServiceManager::exitServiceMode() {
   
   currentState = SERVICE_INACTIVE;
   configChanged = false;
-  orientationChanged = false;  // *** NEU: Flags zurücksetzen ***
+  orientationChanged = false;
   
   #if DB_INFO == 1
     Serial.println("DEBUG: Service-Modus verlassen");
   #endif
   
-  // Zurück zum Hauptmenü
+  // *** KORRIGIERT: Zurück zum Hauptmenü (mit korrekter Orientierung) ***
   showMenu();
 }
 
@@ -349,15 +365,18 @@ void ServiceManager::drawServiceMenu() {
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   
   // Header
-  tft.drawCentreString("SERVICE MODUS - V1.50", SCREEN_WIDTH/2, 10, 2);
+  tft.drawCentreString("SERVICE MODUS - V1.60", SCREEN_WIDTH/2, 10, 2);
   tft.drawLine(0, 30, SCREEN_WIDTH, 30, TFT_BLACK);
   
-  // Aktuelle Konfiguration anzeigen - ERWEITERT
+  // *** KORRIGIERTE Konfiguration anzeigen ***
   tft.setTextSize(1);
   String configText = "Device ID: " + currentDeviceID;
   tft.drawCentreString(configText, SCREEN_WIDTH/2, 40, 1);
   
-  String orientText = "Orientierung: " + String(currentOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
+  // *** KORREKTUR: Aktuelle TFT-Rotation anzeigen ***
+  int actualTftRotation = tft.getRotation();
+  String orientText = "TFT-Rotation: " + String(actualTftRotation) + " (" + 
+                     String((actualTftRotation == 0 || actualTftRotation == 2) ? "PORTRAIT" : "LANDSCAPE") + ")";
   tft.drawCentreString(orientText, SCREEN_WIDTH/2, 50, 1);
   
   // Bildschirm-Dimensionen anzeigen
@@ -575,33 +594,45 @@ void ServiceManager::onEditDeviceID() {
 }
 
 void ServiceManager::onToggleOrientation() {
-  // Orientierung umschalten
-  if (currentOrientation == LANDSCAPE) {
-    currentOrientation = PORTRAIT;
-  } else {
+  #if DB_INFO == 1
+    Serial.print("DEBUG: onToggleOrientation() - Aktuelle TFT-Rotation: ");
+    Serial.print(tft.getRotation());
+    Serial.print(" → Umschalten auf: ");
+  #endif
+  
+  // *** KORREKTUR: Basierend auf aktueller TFT-Rotation umschalten ***
+  int currentTftRotation = tft.getRotation();
+  
+  if (currentTftRotation == 0 || currentTftRotation == 2) {
+    // Aktuell Portrait → wechseln zu Landscape
     currentOrientation = LANDSCAPE;
+    #if DB_INFO == 1
+      Serial.println("LANDSCAPE");
+    #endif
+  } else {
+    // Aktuell Landscape → wechseln zu Portrait  
+    currentOrientation = PORTRAIT;
+    #if DB_INFO == 1
+      Serial.println("PORTRAIT");
+    #endif
   }
   
   configChanged = true;
-  orientationChanged = true;  // *** NEU: Orientierungs-Änderung markieren ***
+  orientationChanged = true;
   
-  #if DB_INFO == 1
-    Serial.print("DEBUG: Orientierung umgeschaltet auf: ");
-    Serial.println(currentOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
-    Serial.print("DEBUG: Original war: ");
-    Serial.println(originalOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
-  #endif
-  
-  // Bestätigungsmeldung anzeigen (ohne Orientierung zu ändern)
+  // *** Bestätigungsmeldung anzeigen (ohne Orientierung zu ändern) ***
   tft.fillRect(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40, TFT_DARKGREEN);
   tft.setTextColor(TFT_WHITE);
   String orientText = (currentOrientation == LANDSCAPE) ? "LANDSCAPE" : "PORTRAIT";
-  tft.drawCentreString("Orientierung gesetzt: " + orientText, SCREEN_WIDTH/2, SCREEN_HEIGHT - 25, 2);
-  tft.drawCentreString("Wird beim Verlassen angewendet", SCREEN_WIDTH/2, SCREEN_HEIGHT - 10, 1);
+  tft.drawCentreString("Neue Orientierung: " + orientText, SCREEN_WIDTH/2, SCREEN_HEIGHT - 25, 2);
+  tft.drawCentreString("Wird beim SAVE & EXIT angewendet", SCREEN_WIDTH/2, SCREEN_HEIGHT - 10, 1);
   
   delay(2000);
   
-  // Service-Menü neu zeichnen (aber in Landscape belassen)
+  // *** Service-Button Label aktualisieren ***
+  initServiceButtons();  // Button-Labels neu setzen
+  
+  // Service-Menü neu zeichnen
   drawServiceMenu();
 }
 
@@ -989,18 +1020,58 @@ void ServiceManager::setDeviceID(String newID) {
 }
 
 int ServiceManager::getOrientation() {
-  return currentOrientation;
+  // *** KORREKTUR: tft.getRotation() direkt verwenden ***
+  int tftRotation = tft.getRotation();
+  
+  #if DB_INFO == 1
+    Serial.print("DEBUG: TFT Rotation ist: ");
+    Serial.print(tftRotation);
+    Serial.print(" → Orientierung: ");
+    Serial.println((tftRotation == 0 || tftRotation == 2) ? "PORTRAIT" : "LANDSCAPE");
+  #endif
+  
+  // TFT-Rotation zu unserer Orientierung mappem:
+  // 0 oder 2 = Portrait, 1 oder 3 = Landscape
+  return (tftRotation == 0 || tftRotation == 2) ? PORTRAIT : LANDSCAPE;
 }
 
 void ServiceManager::setOrientation(int orientation) {
-  if (orientation == PORTRAIT || orientation == LANDSCAPE) {
-    currentOrientation = orientation;
-    configChanged = true;
-    
-    #if DB_INFO == 1
-      Serial.print("DEBUG: Orientierung geändert auf: ");
-      Serial.println(currentOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
-    #endif
+  #if DB_INFO == 1
+    Serial.print("DEBUG: setOrientation() aufgerufen mit: ");
+    Serial.println(orientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
+  #endif
+  
+  // *** KORREKTUR: Sofortige TFT-Anwendung ***
+  if (orientation == PORTRAIT) {
+    tft.setRotation(ROTATION_0);        // Portrait
+    currentOrientation = PORTRAIT;
+  } else {
+    tft.setRotation(ROTATION_270);      // Landscape USB rechts (Standard)
+    currentOrientation = LANDSCAPE;
+  }
+  
+  configChanged = true;
+  orientationChanged = true;
+  
+  #if DB_INFO == 1
+    Serial.print("DEBUG: TFT Rotation gesetzt auf: ");
+    Serial.print(tft.getRotation());
+    Serial.print(", currentOrientation: ");
+    Serial.println(currentOrientation == LANDSCAPE ? "LANDSCAPE" : "PORTRAIT");
+  #endif
+  
+  // *** UI SOFORT NEU AUFBAUEN ***
+  // Buttons neu initialisieren für neue Orientierung
+  initButtons();
+  
+  // Header neu initialisieren für neue Orientierung  
+  if (currentState == SERVICE_ACTIVE) {
+    // Im Service-Modus: Service-Buttons neu initialisieren
+    initServiceButtons();
+    drawServiceMenu();
+  } else {
+    // Im Normal-Modus: Hauptmenü neu zeichnen
+    showMenu();
   }
 }
 

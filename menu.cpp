@@ -97,51 +97,90 @@ int checkButtonPress(int x, int y) {
 }
 
 // Initialisiert die Buttons mit ihren Positionen und Farben
+// Initialisiert die Buttons mit ihren Positionen und Farben
 void initButtons() {
+  // *** DYNAMISCHE Button-Berechnung basierend auf aktueller TFT-Größe ***
+  int currentWidth = tft.width();
+  int currentHeight = tft.height();
   int rotation = tft.getRotation();
+  
+  #if DB_INFO == 1
+    Serial.print("DEBUG: initButtons() - TFT-Rotation: ");
+    Serial.print(rotation);
+    Serial.print(", Größe: ");
+    Serial.print(currentWidth);
+    Serial.print("x");
+    Serial.println(currentHeight);
+  #endif
+  
   int headerOffset = HEADER_HEIGHT + 5;
-  int availableHeight = SCREEN_HEIGHT - headerOffset;
+  int availableHeight = currentHeight - headerOffset;
 
+  // *** KORRIGIERTE Orientierungs-Erkennung ***
   if (rotation == 0 || rotation == 2) {
-    // 2x3 Layout für Portrait und Portrait 180°
-    buttonWidth = SCREEN_WIDTH / 2;
+    // Portrait-Rotationen: 2x3 Layout
+    buttonWidth = currentWidth / 2;
     buttonHeight = availableHeight / 3;
+
+    #if DB_INFO == 1
+      Serial.println("DEBUG: Portrait-Layout (2x3) - Buttons: " + String(buttonWidth) + "x" + String(buttonHeight));
+    #endif
 
     for (int i = 0; i < NUM_BUTTONS; i++) {
       int col = i % 2;
       int row = i / 2;
       int x = col * buttonWidth;
       int y = headerOffset + row * buttonHeight;
-      if (rotation == 2) { // Spiegeln
-        x = SCREEN_WIDTH - x - buttonWidth;
-        y = SCREEN_HEIGHT - y - buttonHeight;
+      
+      // *** KORRIGIERT: Spiegelung nur bei Rotation 2 (Portrait 180°) ***
+      if (rotation == 2) {
+        x = currentWidth - x - buttonWidth;
+        y = currentHeight - y - buttonHeight;
       }
+      
       buttons[i].x = x;
       buttons[i].y = y;
       buttons[i].w = buttonWidth;
       buttons[i].h = buttonHeight;
+      
+      #if DB_INFO == 1
+        Serial.printf("DEBUG: Button %d (Portrait): x=%d, y=%d, w=%d, h=%d\n", 
+                     i+1, buttons[i].x, buttons[i].y, buttons[i].w, buttons[i].h);
+      #endif
     }
   } else {
-    // 3x2 Layout für Landscape 90° und 270°
-    buttonWidth = SCREEN_WIDTH / 3;
+    // Landscape-Rotationen: 3x2 Layout
+    buttonWidth = currentWidth / 3;
     buttonHeight = availableHeight / 2;
+
+    #if DB_INFO == 1
+      Serial.println("DEBUG: Landscape-Layout (3x2) - Buttons: " + String(buttonWidth) + "x" + String(buttonHeight));
+    #endif
 
     for (int i = 0; i < NUM_BUTTONS; i++) {
       int col = i % 3;
       int row = i / 3;
       int x = col * buttonWidth;
       int y = headerOffset + row * buttonHeight;
-      if (rotation == 3) { // Spiegeln X-Achse
-        x = SCREEN_WIDTH - x - buttonWidth;
+      
+      // *** KORRIGIERT: Spiegelung nur bei Rotation 3 (Landscape 270° - USB rechts) ***
+      if (rotation == 3) {
+        x = currentWidth - x - buttonWidth;
       }
+      
       buttons[i].x = x;
       buttons[i].y = y;
       buttons[i].w = buttonWidth;
       buttons[i].h = buttonHeight;
+      
+      #if DB_INFO == 1
+        Serial.printf("DEBUG: Button %d (Landscape): x=%d, y=%d, w=%d, h=%d\n", 
+                     i+1, buttons[i].x, buttons[i].y, buttons[i].w, buttons[i].h);
+      #endif
     }
   }
 
-  // *** KORRIGIERT: Button-Labels und IDs richtig setzen ***
+  // *** Button-Labels und IDs setzen (unverändert) ***
   for (int i = 0; i < NUM_BUTTONS; i++) {
     buttons[i].label = "Taster " + String(i + 1);
     buttons[i].instanceID = String(17 + i);  // IDs 17-22
@@ -152,15 +191,15 @@ void initButtons() {
   }
 
   #if DB_INFO == 1
-    Serial.println("=== Button-Initialisierung ===");
-    for (int i = 0; i < NUM_BUTTONS; i++) {
-      Serial.printf("Button %d: Label='%s', ID='%s', Pos=(%d,%d), Größe=(%dx%d)\n", 
-                    i+1, buttons[i].label.c_str(), buttons[i].instanceID.c_str(),
-                    buttons[i].x, buttons[i].y, buttons[i].w, buttons[i].h);
-    }
-    Serial.println("=============================");
+    Serial.println("=== Button-Layout nach initButtons() ===");
+    Serial.printf("Screen: %dx%d, Rotation: %d\n", currentWidth, currentHeight, rotation);
+    Serial.printf("Button-Größe: %dx%d\n", buttonWidth, buttonHeight);
+    Serial.printf("Header-Offset: %d, Verfügbare Höhe: %d\n", headerOffset, availableHeight);
+    Serial.println("=========================================");
   #endif
 }
+
+
 // Zeigt das Hauptmenü an
 void showMenu() {
   tft.fillScreen(TFT_WHITE);
@@ -168,14 +207,18 @@ void showMenu() {
   // *** Header zeichnen ***
   drawHeader();
   
-  // *** ENTFERNT: Hauptmenü-Titel ***
-  // *** ENTFERNT: Helligkeit-Anzeige ***
-  
-  // Initialisiere Buttons (mit Header-Offset, aber ohne Titel)
+  // *** Initialisiere Buttons für aktuelle Orientierung ***
   initButtons();
   
   // Zeichne Buttons
   drawButtons();
   
-  // *** ENTFERNT: Test-Button (wird ins Service-Menü integriert) ***
+  #if DB_INFO == 1
+    Serial.print("DEBUG: showMenu() abgeschlossen - TFT-Rotation: ");
+    Serial.print(tft.getRotation());
+    Serial.print(", Größe: ");
+    Serial.print(tft.width());
+    Serial.print("x");
+    Serial.println(tft.height());
+  #endif
 }

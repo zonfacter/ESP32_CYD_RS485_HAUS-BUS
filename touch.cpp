@@ -16,11 +16,12 @@ void setupTouch() {
   touchscreenSPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
   touchscreen.begin(touchscreenSPI);
   
-  // Setze Touchscreen-Rotation basierend auf der Bildschirmausrichtung
-  #if SCREEN_ORIENTATION == PORTRAIT
-    touchscreen.setRotation(0);
-  #else // LANDSCAPE
-    touchscreen.setRotation(1);
+  // *** KORRIGIERT: Touch-Rotation wird automatisch über getTouchPoint() gehandhabt ***
+  // Keine feste setRotation() mehr, da getTouchPoint() alle Rotationen unterstützt
+  
+  #if DB_INFO == 1
+    Serial.print("DEBUG: Touch initialisiert für TFT-Rotation: ");
+    Serial.println(tft.getRotation());
   #endif
 }
 
@@ -28,17 +29,26 @@ void setupTouch() {
 void getTouchPoint(int *x, int *y) {
   TS_Point p = touchscreen.getPoint();
   int rotation = tft.getRotation();
+  
+  #if DB_INFO == 1
+    Serial.print("DEBUG: Touch Raw - X: ");
+    Serial.print(p.x);
+    Serial.print(", Y: ");
+    Serial.print(p.y);
+    Serial.print(", TFT-Rotation: ");
+    Serial.println(rotation);
+  #endif
 
+  // *** KORRIGIERTE Touch-Mapping für alle Rotationen ***
   switch (rotation) {
-    case 0: // Portrait
+    case 0: // Portrait (0°)
       *x = map(p.x, TOUCH_MIN_X, TOUCH_MAX_X, 0, tft.width());
       *y = map(p.y, TOUCH_MIN_Y, TOUCH_MAX_Y, 0, tft.height());
       break;
       
     case 1: // Landscape 90° (USB links)
       *x = map(p.y, TOUCH_MIN_Y, TOUCH_MAX_Y, 0, tft.width());
-      // *** HIER: Y-Achse invertiert ***
-      *y = map(p.x, TOUCH_MIN_X, TOUCH_MAX_X, 0, tft.height());
+      *y = map(p.x, TOUCH_MAX_X, TOUCH_MIN_X, 0, tft.height()); // Y invertiert
       break;
       
     case 2: // Portrait 180°
@@ -46,15 +56,27 @@ void getTouchPoint(int *x, int *y) {
       *y = map(p.y, TOUCH_MAX_Y, TOUCH_MIN_Y, 0, tft.height());
       break;
       
-    case 3: // Landscape 270° (USB rechts)
+    case 3: // Landscape 270° (USB rechts) - Standard
       *x = map(p.y, TOUCH_MAX_Y, TOUCH_MIN_Y, 0, tft.width());
-      // *** HIER: Y-Achse invertiert ***  
-      *y = map(p.x, TOUCH_MAX_X, TOUCH_MIN_X, 0, tft.height());
+      *y = map(p.x, TOUCH_MIN_X, TOUCH_MAX_X, 0, tft.height()); // Y invertiert
       break;
   }
 
+  // Koordinaten auf gültige Bereiche begrenzen
   *x = constrain(*x, 0, tft.width() - 1);
   *y = constrain(*y, 0, tft.height() - 1);
+  
+  #if DB_INFO == 1
+    Serial.print("DEBUG: Touch Mapped - X: ");
+    Serial.print(*x);
+    Serial.print(", Y: ");
+    Serial.print(*y);
+    Serial.print(" (Screen: ");
+    Serial.print(tft.width());
+    Serial.print("x");
+    Serial.print(tft.height());
+    Serial.println(")");
+  #endif
 }
 
 

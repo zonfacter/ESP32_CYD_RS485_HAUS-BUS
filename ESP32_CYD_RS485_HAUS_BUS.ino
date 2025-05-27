@@ -117,6 +117,16 @@ void loop() {
     int x, y;
     getTouchPoint(&x, &y);
     
+    #if DB_INFO == 1
+      Serial.print("DEBUG: Touch erkannt - X: ");
+      Serial.print(x);
+      Serial.print(", Y: ");
+      Serial.print(y);
+      Serial.print(" (Service-Mode: ");
+      Serial.print(serviceManager.isServiceMode() ? "JA" : "NEIN");
+      Serial.println(")");
+    #endif
+    
     // Service-Manager Touch-Handling zuerst prüfen
     if (serviceManager.isServiceMode()) {
       handleServiceTouch(x, y, true);
@@ -138,9 +148,8 @@ void loop() {
       return;
     }
     
-    // *** ENTFERNT: Test-Button Touch-Handling (jetzt im Service-Menü) ***
-    
- int buttonPressed = checkButtonPress(x, y);
+    // *** NORMALE BUTTON-VERARBEITUNG ***
+    int buttonPressed = checkButtonPress(x, y);
     
     if (buttonPressed >= 0) {
       #if DB_INFO == 1
@@ -186,8 +195,7 @@ void loop() {
           Serial.println("DEBUG: FALLENDE FLANKE - Telegramm STATUS.0 gesendet");
         #endif
         
-        // *** EINFACH: Button immer auf inaktiv (grau) setzen nach Loslassen ***
-        // (LED-Telegramme können ihn später wieder aktivieren)
+        // Button auf inaktiv (grau) setzen nach Loslassen
         setButtonActive(buttonPressed, false);
         
         #if DB_INFO == 1
@@ -196,8 +204,7 @@ void loop() {
           Serial.println(" nach Loslassen auf grau gesetzt");
         #endif
       }
-     }
-    
+    }
   } else {
     // Auch ohne Touch Service-Manager updaten
     if (serviceManager.isServiceMode()) {
@@ -215,6 +222,14 @@ void loop() {
 
 void initializeButtons() {
   // Button-Konfiguration wird in menu.cpp/initButtons() gesetzt
+  Serial.println("\n=== ORIENTIERUNGS-TEST SETUP ===");
+  Serial.print("TFT-Rotation beim Start: ");
+  Serial.println(tft.getRotation());
+  Serial.print("Bildschirmgröße: ");
+  Serial.print(tft.width());
+  Serial.print(" x ");
+  Serial.println(tft.height());
+  
   Serial.println("\n=== Button-LED-Zuordnung ===");
   Serial.println("Button 1 (Index 0) → BTN.17 ↔ LED.49");
   Serial.println("Button 2 (Index 1) → BTN.18 ↔ LED.50");
@@ -223,7 +238,8 @@ void initializeButtons() {
   Serial.println("Button 5 (Index 4) → BTN.21 ↔ LED.53");
   Serial.println("Button 6 (Index 5) → BTN.22 ↔ LED.54");
   Serial.println("============================");
-  Serial.println("INFO: Langer Button-Press (5s) = Service-Manager");
+  Serial.println("INFO: Service-Icon Touch (rechts oben) = Service-Menü");
+  Serial.println("INFO: Service-Menü → Orientierung umschalten testen");
 }
 
 void showStartupScreen() {

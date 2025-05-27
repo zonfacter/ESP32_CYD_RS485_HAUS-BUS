@@ -74,9 +74,13 @@ String formatDate() {
 }
 
 void drawHeader() {
+  // *** DYNAMISCHE Header-Größen ***
+  int currentScreenWidth = tft.width();
+  int currentScreenHeight = tft.height();
+  
   // Header-Hintergrund (dunkelgrau)
-  tft.fillRect(0, 0, SCREEN_WIDTH, HEADER_HEIGHT, TFT_DARKGREY);
-  tft.drawLine(0, HEADER_HEIGHT, SCREEN_WIDTH, HEADER_HEIGHT, TFT_BLACK);
+  tft.fillRect(0, 0, currentScreenWidth, HEADER_HEIGHT, TFT_DARKGREY);
+  tft.drawLine(0, HEADER_HEIGHT, currentScreenWidth, HEADER_HEIGHT, TFT_BLACK);
   
   // Text-Einstellungen
   tft.setTextColor(TFT_WHITE, TFT_DARKGREY);
@@ -90,17 +94,21 @@ void drawHeader() {
   String dateStr = formatDate();
   tft.drawString(dateStr, 45, 6, 1);
   
-  // Device ID rechts-mitte
+  // Device ID rechts-mitte - DYNAMISCH berechnet
   String deviceID = "ID:" + serviceManager.getDeviceID();
   int deviceIdWidth = deviceID.length() * 6;  // Ungefähre Breite
-  int deviceIdX = SCREEN_WIDTH - SERVICE_ICON_SIZE - deviceIdWidth - 8;
+  int deviceIdX = currentScreenWidth - SERVICE_ICON_SIZE - deviceIdWidth - 8;
   tft.drawString(deviceID, deviceIdX, 6, 1);
   
-  // Service-Icon rechts
+  // Service-Icon rechts - DYNAMISCH berechnet
   drawServiceIcon(serviceManager.isServiceMode());
 }
 
+
 void updateHeaderTime() {
+  // *** DYNAMISCHE Zeit-Update für alle Orientierungen ***
+  int currentScreenWidth = tft.width();
+  
   // Nur Zeit und Datum aktualisieren (ohne kompletten Header neu zu zeichnen)
   updateSimulatedTime();
   
@@ -114,18 +122,26 @@ void updateHeaderTime() {
   tft.fillRect(45, 1, 70, 18, TFT_DARKGREY);
   String dateStr = formatDate();
   tft.drawString(dateStr, 45, 6, 1);
+  
+  // *** Service-Icon bei Orientierungsumschaltung neu positionieren ***
+  drawServiceIcon(serviceManager.isServiceMode());
 }
 
 void drawServiceIcon(bool active) {
+  // *** DYNAMISCHE Service-Icon Position ***
+  int currentScreenWidth = tft.width();
+  int serviceIconX = currentScreenWidth - SERVICE_ICON_SIZE - 2;
+  int serviceIconY = SERVICE_ICON_Y;  // Bleibt konstant
+  
   // Service-Icon: Zahnrad-Symbol in 18x18 Pixel
   uint16_t iconColor = active ? TFT_YELLOW : TFT_LIGHTGREY;
   uint16_t bgColor = TFT_DARKGREY;
   
-  int centerX = SERVICE_ICON_X + SERVICE_ICON_SIZE/2;
-  int centerY = SERVICE_ICON_Y + SERVICE_ICON_SIZE/2;
+  int centerX = serviceIconX + SERVICE_ICON_SIZE/2;
+  int centerY = serviceIconY + SERVICE_ICON_SIZE/2;
   
   // Hintergrund löschen
-  tft.fillRect(SERVICE_ICON_X, SERVICE_ICON_Y, SERVICE_ICON_SIZE, SERVICE_ICON_SIZE, bgColor);
+  tft.fillRect(serviceIconX, serviceIconY, SERVICE_ICON_SIZE, SERVICE_ICON_SIZE, bgColor);
   
   // Einfaches Zahnrad-Symbol (8x8 Pixel Kern + Zähne)
   // Äußerer Kreis (Zahnrad-Rand)
@@ -144,15 +160,32 @@ void drawServiceIcon(bool active) {
     tft.fillRect(x-1, y-1, 2, 2, iconColor);
   }
   
-  // Service-Symbol "S" in der Mitte (falls gewünscht)
+  // Service-Symbol "S" in der Mitte
   tft.setTextColor(bgColor, iconColor);
   tft.drawString("S", centerX-3, centerY-4, 1);
+  
+  #if DB_INFO == 1
+    Serial.print("DEBUG: Service-Icon gezeichnet bei X=");
+    Serial.print(serviceIconX);
+    Serial.print(", Y=");
+    Serial.print(serviceIconY);
+    Serial.print(" (Screen: ");
+    Serial.print(currentScreenWidth);
+    Serial.print("x");
+    Serial.print(tft.height());
+    Serial.println(")");
+  #endif
 }
 
 bool checkServiceIconTouch(int x, int y) {
+  // *** DYNAMISCHE Touch-Bereich Berechnung ***
+  int currentScreenWidth = tft.width();
+  int serviceTouchX = currentScreenWidth - SERVICE_TOUCH_AREA_WIDTH;
+  int serviceTouchY = SERVICE_TOUCH_Y;
+  
   // *** VERGRÖSSERTER Touch-Bereich: Komplette rechte obere Ecke ***
-  bool inTouchArea = (x >= SERVICE_TOUCH_X && x <= SCREEN_WIDTH &&
-                      y >= SERVICE_TOUCH_Y && y <= SERVICE_TOUCH_Y + SERVICE_TOUCH_AREA_HEIGHT);
+  bool inTouchArea = (x >= serviceTouchX && x <= currentScreenWidth &&
+                      y >= serviceTouchY && y <= serviceTouchY + SERVICE_TOUCH_AREA_HEIGHT);
   
   #if DB_INFO == 1
     if (inTouchArea) {
@@ -161,13 +194,17 @@ bool checkServiceIconTouch(int x, int y) {
       Serial.print(", Y: ");
       Serial.print(y);
       Serial.print(" (Touch-Bereich: X=");
-      Serial.print(SERVICE_TOUCH_X);
+      Serial.print(serviceTouchX);
       Serial.print("-");
-      Serial.print(SCREEN_WIDTH);
+      Serial.print(currentScreenWidth);
       Serial.print(", Y=");
-      Serial.print(SERVICE_TOUCH_Y);
+      Serial.print(serviceTouchY);
       Serial.print("-");
-      Serial.print(SERVICE_TOUCH_Y + SERVICE_TOUCH_AREA_HEIGHT);
+      Serial.print(serviceTouchY + SERVICE_TOUCH_AREA_HEIGHT);
+      Serial.print(", Screen: ");
+      Serial.print(currentScreenWidth);
+      Serial.print("x");
+      Serial.print(tft.height());
       Serial.println(")");
     }
   #endif
