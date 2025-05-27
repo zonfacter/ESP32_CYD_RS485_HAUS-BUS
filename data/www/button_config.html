@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Button-Konfiguration - ESP32 Touch Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .orientation-switch {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .orientation-switch h3 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+        
+        .orientation-btn {
+            padding: 12px 25px;
+            margin: 0 10px;
+            border: 2px solid #3498db;
+            border-radius: 25px;
+            background: white;
+            color: #3498db;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .orientation-btn.active {
+            background: #3498db;
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+        
+        .preview-section {
+            background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+            border: 3px solid #404040;
+        }
+        
+        .preview-section h3 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+        }
+        
+        .button-preview-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        
+        .button-preview-grid.portrait {
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+        }
+        
+        .button-preview {
+            aspect-ratio: 1;
+            border: 3px solid #555;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #808080;
+            color: white;
+            font-weight: 600;
+            position: relative;
+            min-height: 100px;
+        }
+        
+        .button-preview:hover {
+            border-color: #3498db;
+            transform: scale(1.05);
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.4);
+        }
+        
+        .button-preview.selected {
+            border-color: #ffd700;
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.8);
+            transform: scale(1.1);
+        }
+        
+        .button-preview .icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        
+        .button-preview .label {
+            font-size: 13px;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 90%;
+        }
+        
+        .button-preview .number {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .config-panel {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .config-panel h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 1.3em;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        
+        .form-group input,
+        .form-group select {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: white;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+            transform: translateY(-1px);
+        }
+        
+        .color-input {
+            height: 50px !important;
+            border: none !important;
+            border-radius: 8px !important;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .color-input:hover {
+            transform: scale(1.05);
+        }
+        
+        .checkbox-group {
+            display: flex;
+            gap: 25px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: background-color 0.3s ease;
+        }
+        
+        .checkbox-group label:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            transform: scale(1.4);
+            accent-color: #3498db;
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-primary { background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; }
+        .btn-success { background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); color: white; }
+        .btn-warning { background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; }
+        .btn-secondary { background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%); color: white; }
+        .btn-info { background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white; }
+        
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .message {
+            padding: 15px 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: 500;
+            animation: slideInRight 0.3s ease;
+            position: relative;
+            border-left: 4px solid;
+        }
+        
+        .message.success {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            color: #155724;
+            border-left-color: #28a745;
+        }
+        
+        .message.error {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            color: #721c24;
+            border-left-color: #dc3545;
+        }
+        
+        .message.warning {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            color: #856404;
+            border-left-color: #ffc107;
+        }
+        
+        .message.info {
+            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+            color: #0c5460;
+            border-left-color: #17a2b8;
+        }
+        
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .template-section {
+            background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 2px solid #4caf50;
+        }
+        
+        .template-section h3 {
+            color: #2e7d32;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }
+        
+        .export-info {
+            background: linear-gradient(135deg, #e7f3ff 0%, #cce7ff 100%);
+            border: 2px solid #2196f3;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        
+        .status-bar {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(44, 62, 80, 0.9);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 25px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(5px);
+            display: none;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #3498db;
+            border-top: 5px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 10px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .checkbox-group {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+            }
+            
+            .button-preview-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+            
+            .button-preview-grid.portrait {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🎛️ Button-Konfiguration</h1>
+            <p>Konfigurieren Sie die 6 Touch-Buttons Ihres ESP32-Panels mit lokaler SPIFFS-Speicherung</p>
+        </div>
+        
+        <div class="content">
+            <!-- Orientierungs-Umschaltung -->
+            <div class="orientation-switch">
+                <h3>📱 Display-Orientierung</h3>
+                <button id="landscapeBtn" class="orientation-btn active" onclick="setOrientation('landscape')">
+                    🖥️ Landscape (3×2 Layout)
+                </button>
+                <button id="portraitBtn" class="orientation-btn" onclick="setOrientation('portrait')">
+                    📱 Portrait (2×3 Layout)
+                </button>
+            </div>
+            <!-- Zeit-Synchronisation für Button-Konfigurator -->
+			<div class="card">
+				<h3>🕐 Zeit synchronisieren</h3>
+				<p>Aktuelle ESP32-Zeit: <span id="esp32Time">--:--</span></p>
+				<button class="btn btn-info" onclick="syncTimeFromBrowser()">
+					🔄 Browser-Zeit übernehmen
+				</button>
+			</div>
+            <!-- Button-Preview -->
+            <div class="preview-section">
+                <h3>🔍 Button-Layout Vorschau</h3>
+                <div id="buttonPreviewGrid" class="button-preview-grid">
+                    <!-- Buttons werden dynamisch erstellt -->
+                </div>
+                <p style="margin-top: 15px; color: #ccc; font-size: 14px;">
+                    💡 Klicken Sie auf einen Button um ihn zu konfigurieren
+                </p>
+            </div>
+            
+            <!-- Button-Konfiguration -->
+            <div class="config-panel">
+                <h3>⚙️ Button <span id="currentButtonNumber">1</span> konfigurieren</h3>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="buttonLabel">🏷️ Beschriftung:</label>
+                        <input type="text" id="buttonLabel" placeholder="z.B. Wohnzimmer Licht" maxlength="20">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="buttonDescription">📝 Beschreibung:</label>
+                        <input type="text" id="buttonDescription" placeholder="Detaillierte Beschreibung für Web-UI" maxlength="50">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="buttonInstanceID">🔌 Instanz-ID (RS485):</label>
+                        <input type="text" id="buttonInstanceID" placeholder="17-22" maxlength="2" pattern="[0-9]{1,2}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="buttonIcon">🎨 Symbol:</label>
+                        <select id="buttonIcon">
+                            <option value="LIGHT">💡 Beleuchtung</option>
+                            <option value="SHUTTER">🏠 Rollade</option>
+                            <option value="SWITCH">🔘 Schalter</option>
+                            <option value="DIMMER">🔆 Dimmer</option>
+                            <option value="TEMPERATURE">🌡️ Temperatur</option>
+                            <option value="VENTILATION">💨 Lüftung</option>
+                            <option value="CUSTOM">⚪ Standard</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="colorInactive">🎨 Farbe (Inaktiv):</label>
+                        <input type="color" id="colorInactive" class="color-input" value="#808080">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="colorActive">🎨 Farbe (Aktiv):</label>
+                        <input type="color" id="colorActive" class="color-input" value="#00FF00">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="textColor">✏️ Textfarbe:</label>
+                        <input type="color" id="textColor" class="color-input" value="#FFFFFF">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="buttonPriority">📊 CSMA/CD Priorität:</label>
+                        <select id="buttonPriority">
+                            <option value="0">0 - Kritisch (höchste Priorität)</option>
+                            <option value="1">1 - Hoch</option>
+                            <option value="5" selected>5 - Normal (Standard)</option>
+                            <option value="7">7 - Niedrig</option>
+                            <option value="9">9 - Hintergrund</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="showIcon" checked>
+                        🎨 Symbol anzeigen
+                    </label>
+                    <label>
+                        <input type="checkbox" id="showLabel" checked>
+                        📝 Text anzeigen
+                    </label>
+                    <label>
+                        <input type="checkbox" id="buttonEnabled" checked>
+                        ✅ Button aktiviert
+                    </label>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-success" onclick="saveButtonConfig()">
+                        💾 Button speichern
+                    </button>
+                    <button class="btn btn-primary" onclick="testButton()">
+                        🧪 Button testen
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetButton()">
+                        🔄 Zurücksetzen
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Template-System -->
+            <div class="template-section">
+                <h3>📋 Templates & Export/Import</h3>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="templateSelect">📦 Vordefinierte Templates:</label>
+                        <select id="templateSelect">
+                            <option value="">-- Template wählen --</option>
+                            <option value="wohnzimmer">🏠 Wohnzimmer Standard</option>
+                            <option value="schlafzimmer">🛏️ Schlafzimmer</option>
+                            <option value="rolladen">🏠 Rolladen-Set</option>
+                            <option value="beleuchtung">💡 Beleuchtung-Set</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>📋 Template anwenden:</label>
+                        <button class="btn btn-primary" onclick="applyTemplate()" style="width: 100%;">
+                            ✅ Template anwenden
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-success" onclick="exportConfig()">
+                        📤 Konfiguration exportieren
+                    </button>
+                    
+                    <button class="btn btn-warning" onclick="importConfig()">
+                        📥 Konfiguration importieren
+                    </button>
+                    
+                    <button class="btn btn-info" onclick="saveAsTemplate()">
+                        💾 Als Template speichern
+                    </button>
+                </div>
+                
+                <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
+                
+                <div class="export-info">
+                    <strong>💡 Hinweis:</strong> Exportierte Dateien enthalten Ihre komplette Button-Konfiguration 
+                    und können auf anderen ESP32-Geräten importiert werden. Templates werden lokal im ESP32-SPIFFS gespeichert.
+                    Alle Konfigurationen werden persistent im Flash-Speicher abgelegt.
+                </div>
+            </div>
+            
+            <!-- Globale Aktionen -->
+            <div class="config-panel">
+                <h3>🔧 Globale Aktionen</h3>
+                <div class="action-buttons">
+                    <button class="btn btn-success" onclick="saveAllButtons()">
+                        💾 Alle Buttons speichern
+                    </button>
+                    <button class="btn btn-warning" onclick="resetAllButtons()">
+                        🔄 Alle zurücksetzen
+                    </button>
+                    <button class="btn btn-primary" onclick="testAllButtons()">
+                        🧪 Alle Buttons testen
+                    </button>
+                    <button class="btn btn-info" onclick="backupConfig()">
+                        💾 Backup erstellen
+                    </button>
+                    <button class="btn btn-secondary" onclick="window.location.href='/'">
+                        🏠 Zurück zum Dashboard
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Status-Nachrichten -->
+            <div id="messageContainer"></div>
+        </div>
+    </div>
+    
+    <!-- Status-Bar -->
+    <div class="status-bar" id="statusBar">
+        ESP32 verbunden ✅ | SPIFFS: OK | Letzte Aktion: Laden...
+    </div>
+    
+    <script>
+        // Button-Konfigurator JavaScript - SPIFFS-Version für ESP32
+        class ButtonConfigurator {
+    constructor() {
+        this.currentButton = 0;
+        this.config = null;
+        this.orientation = 'landscape';
+        this.templates = null;
+        this.ESP32_BASE_URL = window.location.origin;
+        this.init();
+    }
+    
+    async init() {
+        console.log('🚀 ESP32 Button-Konfigurator wird initialisiert...');
+        this.showLoading(true);
+        
+        try {
+            await this.loadConfig();
+            await this.loadTemplates();
+            this.createButtonPreviews();
+            this.selectButton(0);
+            this.setupEventListeners();
+            this.showMessage('Button-Konfigurator bereit! 🎉', 'success');
+            this.updateStatusBar('Erfolgreich geladen');
+        } catch (error) {
+            console.error('❌ Initialisierung fehlgeschlagen:', error);
+            this.showMessage('Initialisierung fehlgeschlagen. Offline-Modus aktiviert.', 'warning');
+            this.config = this.createDefaultConfig();
+            this.createButtonPreviews();
+            this.selectButton(0);
+            this.setupEventListeners();
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    async loadConfig() {
+        try {
+            console.log('📁 Lade Button-Konfiguration vom ESP32...');
+            const response = await fetch('/config/buttons');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            this.config = data.buttons || this.createDefaultConfig();
+            console.log('✅ Konfiguration geladen:', this.config);
+        } catch (error) {
+            console.error('❌ Fehler beim Laden der Konfiguration:', error);
+            this.config = this.createDefaultConfig();
+            this.showMessage('Standard-Konfiguration verwendet (ESP32 nicht erreichbar)', 'warning');
+        }
+    }
+    
+    createDefaultConfig() {
+        const defaultConfig = [];
+        const iconTypes = ['LIGHT', 'SHUTTER', 'SWITCH', 'DIMMER', 'TEMPERATURE', 'VENTILATION'];
+        
+        for (let i = 0; i < 6; i++) {
+            defaultConfig.push({
+                id: i,
+                label: `Taster ${i + 1}`,
+                description: `Button ${i + 1} Beschreibung`,
+                instanceID: String(17 + i),
+                iconName: iconTypes[i] || 'CUSTOM',
+                colorInactive: '#808080',
+                colorActive: '#00FF00',
+                textColor: '#FFFFFF',
+                showIcon: true,
+                showLabel: true,
+                enabled: true,
+                priority: 5
+            });
+        }
+        return defaultConfig;
+    }
+    
+    async loadTemplates() {
+        try {
+            console.log('📋 Lade Templates vom ESP32...');
+            const response = await fetch('/config/templates');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            this.templates = data.templates || {};
+            console.log('✅ Templates geladen:', Object.keys(this.templates));
+        } catch (error) {
+            console.error('❌ Templates konnten nicht geladen werden:', error);
+            this.templates = {};
+        }
+    }
+    
+    // KORRIGIERTE saveConfig() Funktion
+    async saveConfig() {
+        try {
+            console.log('💾 Speichere einzelnen Button auf ESP32...');
+            this.showLoading(true);
+            
+            // Aktuellen Button aus Form übernehmen
+            this.updateConfigFromForm();
+            
+            const currentButtonData = this.config[this.currentButton];
+            
+            // Parameter für ESP32 im richtigen Format
+            const formData = new URLSearchParams();
+            formData.append('buttonLabel', currentButtonData.label);
+            formData.append('buttonInstanceID', currentButtonData.instanceID);
+            formData.append('colorInactive', currentButtonData.colorInactive);
+            formData.append('textColor', currentButtonData.textColor);
+            formData.append('id', this.currentButton);
+            formData.append('buttonEnabled', currentButtonData.enabled ? 'true' : 'false');
+            
+            console.log('📤 Sende Button-Parameter:', Object.fromEntries(formData));
+            
+            const response = await fetch('/config/buttons', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const result = await response.json();
+            if (result.success) {
+                this.showMessage('✅ ' + result.message, 'success');
+                this.updateStatusBar('Button gespeichert');
+                console.log('✅ Button gespeichert:', result.message);
+                
+                // Button-Preview aktualisieren
+                this.updateButtonPreview(this.currentButton);
+            } else {
+                throw new Error(result.message || 'Unbekannter Fehler');
+            }
+        } catch (error) {
+            console.error('❌ Speichern fehlgeschlagen:', error);
+            this.showMessage('❌ Speichern fehlgeschlagen: ' + error.message, 'error');
+            this.updateStatusBar('Fehler beim Speichern');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    createButtonPreviews() {
+        const grid = document.getElementById('buttonPreviewGrid');
+        grid.innerHTML = '';
+        grid.className = `button-preview-grid ${this.orientation}`;
+        
+        for (let i = 0; i < 6; i++) {
+            const button = document.createElement('div');
+            button.className = 'button-preview';
+            button.dataset.buttonId = i;
+            button.onclick = () => this.selectButton(i);
+            
+            const number = document.createElement('div');
+            number.className = 'number';
+            number.textContent = i + 1;
+            
+            const icon = document.createElement('div');
+            icon.className = 'icon';
+            icon.textContent = this.getIconEmoji(this.config[i].iconName);
+            
+            const label = document.createElement('div');
+            label.className = 'label';
+            label.textContent = this.config[i].label;
+            
+            button.appendChild(number);
+            button.appendChild(icon);
+            button.appendChild(label);
+            
+            // Button-Farben anwenden
+            button.style.backgroundColor = this.config[i].colorInactive;
+            button.style.color = this.config[i].textColor;
+            
+            // Sichtbarkeit der Elemente
+            icon.style.display = this.config[i].showIcon ? 'block' : 'none';
+            label.style.display = this.config[i].showLabel ? 'block' : 'none';
+            
+            // Deaktivierte Buttons
+            if (!this.config[i].enabled) {
+                button.style.opacity = '0.5';
+                button.style.filter = 'grayscale(50%)';
+            }
+            
+            grid.appendChild(button);
+        }
+    }
+    
+    selectButton(index) {
+        this.currentButton = index;
+        
+        // Visuelle Auswahl
+        document.querySelectorAll('.button-preview').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+        document.querySelector(`[data-button-id="${index}"]`).classList.add('selected');
+        
+        // Form ausfüllen
+        this.updateConfigForm();
+        
+        document.getElementById('currentButtonNumber').textContent = index + 1;
+        this.updateStatusBar(`Button ${index + 1} ausgewählt`);
+        
+        console.log(`📝 Button ${index + 1} ausgewählt:`, this.config[index]);
+    }
+    
+    updateConfigForm() {
+        const button = this.config[this.currentButton];
+        
+        document.getElementById('buttonLabel').value = button.label;
+        document.getElementById('buttonDescription').value = button.description || '';
+        document.getElementById('buttonInstanceID').value = button.instanceID;
+        document.getElementById('buttonIcon').value = button.iconName;
+        document.getElementById('colorInactive').value = button.colorInactive;
+        document.getElementById('colorActive').value = button.colorActive;
+        document.getElementById('textColor').value = button.textColor;
+        document.getElementById('buttonPriority').value = button.priority;
+        document.getElementById('showIcon').checked = button.showIcon;
+        document.getElementById('showLabel').checked = button.showLabel;
+        document.getElementById('buttonEnabled').checked = button.enabled;
+    }
+    
+    updateConfigFromForm() {
+        const button = this.config[this.currentButton];
+        
+        button.label = document.getElementById('buttonLabel').value;
+        button.description = document.getElementById('buttonDescription').value;
+        button.instanceID = document.getElementById('buttonInstanceID').value;
+        button.iconName = document.getElementById('buttonIcon').value;
+        button.colorInactive = document.getElementById('colorInactive').value;
+        button.colorActive = document.getElementById('colorActive').value;
+        button.textColor = document.getElementById('textColor').value;
+        button.priority = parseInt(document.getElementById('buttonPriority').value);
+        button.showIcon = document.getElementById('showIcon').checked;
+        button.showLabel = document.getElementById('showLabel').checked;
+        button.enabled = document.getElementById('buttonEnabled').checked;
+        
+        this.updateButtonPreview(this.currentButton);
+        
+        console.log(`✏️ Button ${this.currentButton + 1} aktualisiert:`, button);
+    }
+    
+    updateButtonPreview(index) {
+        const preview = document.querySelector(`[data-button-id="${index}"]`);
+        const button = this.config[index];
+        
+        preview.style.backgroundColor = button.colorInactive;
+        preview.style.color = button.textColor;
+        
+        const icon = preview.querySelector('.icon');
+        icon.textContent = this.getIconEmoji(button.iconName);
+        icon.style.display = button.showIcon ? 'block' : 'none';
+        
+        const label = preview.querySelector('.label');
+        label.textContent = button.label;
+        label.style.display = button.showLabel ? 'block' : 'none';
+        
+        // Opacity für deaktivierte Buttons
+        preview.style.opacity = button.enabled ? '1' : '0.5';
+        preview.style.filter = button.enabled ? 'none' : 'grayscale(50%)';
+    }
+    
+    getIconEmoji(iconName) {
+        const emojiMap = {
+            'LIGHT': '💡',
+            'SHUTTER': '🏠',
+            'SWITCH': '🔘',
+            'DIMMER': '🔆',
+            'TEMPERATURE': '🌡️',
+            'VENTILATION': '💨',
+            'CUSTOM': '⚪'
+        };
+        return emojiMap[iconName] || '⚪';
+    }
+    
+    setupEventListeners() {
+        // Live-Update bei Eingabeänderungen
+        ['buttonLabel', 'buttonIcon', 'colorInactive', 'colorActive', 'textColor', 'buttonPriority'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                this.updateConfigFromForm();
+            });
+        });
+        
+        ['showIcon', 'showLabel', 'buttonEnabled'].forEach(id => {
+            document.getElementById(id).addEventListener('change', () => {
+                this.updateConfigFromForm();
+            });
+        });
+        
+        // Instance ID Validierung
+        document.getElementById('buttonInstanceID').addEventListener('input', (e) => {
+            const value = e.target.value;
+            if (value && (value < 17 || value > 22)) {
+                e.target.style.borderColor = '#e74c3c';
+                this.showMessage('Instance ID sollte zwischen 17-22 liegen', 'warning', 3000);
+            } else {
+                e.target.style.borderColor = '#ddd';
+            }
+        });
+        
+        console.log('🎧 Event-Listener eingerichtet');
+    }
+    
+    async testButton() {
+        try {
+            console.log(`🧪 Teste Button ${this.currentButton + 1}...`);
+            this.updateStatusBar(`Test Button ${this.currentButton + 1}`);
+            
+            const response = await fetch('/test/button', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${this.currentButton}`
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const result = await response.json();
+            this.showMessage(result.message || `Button ${this.currentButton + 1} getestet`, 'info');
+        } catch (error) {
+            console.error('❌ Test fehlgeschlagen:', error);
+            this.showMessage('❌ Button-Test fehlgeschlagen: ' + error.message, 'error');
+        }
+    }
+    
+    // Weitere Funktionen bleiben unverändert...
+    showMessage(message, type = 'info', duration = 5000) {
+        const container = document.getElementById('messageContainer');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+        messageDiv.textContent = message;
+        
+        // Close-Button hinzufügen
+        const closeBtn = document.createElement('span');
+        closeBtn.textContent = ' ×';
+        closeBtn.style.float = 'right';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.fontWeight = 'bold';
+        closeBtn.style.fontSize = '18px';
+        closeBtn.onclick = () => messageDiv.remove();
+        messageDiv.appendChild(closeBtn);
+        
+        container.appendChild(messageDiv);
+        
+        // Auto-Remove nach Timeout
+        if (duration > 0) {
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.remove();
+                }
+            }, duration);
+        }
+        
+        console.log(`📢 ${type.toUpperCase()}: ${message}`);
+    }
+    
+    showLoading(show) {
+        const overlay = document.getElementById('loadingOverlay');
+        overlay.style.display = show ? 'flex' : 'none';
+    }
+    
+    updateStatusBar(action) {
+        const statusBar = document.getElementById('statusBar');
+        const timestamp = new Date().toLocaleTimeString('de-DE');
+        statusBar.textContent = `ESP32 verbunden ✅ | SPIFFS: OK | ${action} (${timestamp})`;
+    }
+}
+        
+        // Globale Instanz
+        let configurator;
+        
+        // Globale Funktionen für Button-Callbacks
+        function setOrientation(orientation) {
+            configurator.orientation = orientation;
+            configurator.createButtonPreviews();
+            
+            document.getElementById('landscapeBtn').classList.toggle('active', orientation === 'landscape');
+            document.getElementById('portraitBtn').classList.toggle('active', orientation === 'portrait');
+            
+            configurator.updateStatusBar(`Orientierung: ${orientation}`);
+            console.log(`📱 Orientierung geändert: ${orientation}`);
+        }
+        
+        function saveButtonConfig() {
+            configurator.updateConfigFromForm();
+            configurator.saveConfig();
+        }
+        
+        function testButton() {
+            configurator.testButton();
+        }
+        
+        function resetButton() {
+            if (confirm(`Button ${configurator.currentButton + 1} auf Standard zurücksetzen?`)) {
+                const defaultButton = {
+                    id: configurator.currentButton,
+                    label: `Taster ${configurator.currentButton + 1}`,
+                    description: `Button ${configurator.currentButton + 1} Beschreibung`,
+                    instanceID: String(17 + configurator.currentButton),
+                    iconName: 'CUSTOM',
+                    colorInactive: '#808080',
+                    colorActive: '#00FF00',
+                    textColor: '#FFFFFF',
+                    showIcon: true,
+                    showLabel: true,
+                    enabled: true,
+                    priority: 5
+                };
+                
+                configurator.config[configurator.currentButton] = defaultButton;
+                configurator.updateConfigForm();
+                configurator.updateButtonPreview(configurator.currentButton);
+                configurator.showMessage(`Button ${configurator.currentButton + 1} zurückgesetzt`, 'info');
+                configurator.updateStatusBar('Button zurückgesetzt');
+            }
+        }
+        
+        function saveAllButtons() {
+            configurator.saveConfig();
+        }
+        
+        function resetAllButtons() {
+            if (confirm('⚠️ Alle Button-Konfigurationen zurücksetzen?\n\nDies kann nicht rückgängig gemacht werden!')) {
+                for (let i = 0; i < 6; i++) {
+                    configurator.config[i] = {
+                        id: i,
+                        label: `Taster ${i + 1}`,
+                        description: `Button ${i + 1} Beschreibung`,
+                        instanceID: String(17 + i),
+                        iconName: 'CUSTOM',
+                        colorInactive: '#808080',
+                        colorActive: '#00FF00',
+                        textColor: '#FFFFFF',
+                        showIcon: true,
+                        showLabel: true,
+                        enabled: true,
+                        priority: 5
+                    };
+                }
+                configurator.createButtonPreviews();
+                configurator.updateConfigForm();
+                configurator.saveConfig();
+                configurator.showMessage('🔄 Alle Buttons zurückgesetzt', 'warning');
+                configurator.updateStatusBar('Alle Buttons zurückgesetzt');
+            }
+        }
+        
+        function testAllButtons() {
+            configurator.showMessage('🧪 Teste alle Buttons sequenziell...', 'info');
+            configurator.updateStatusBar('Teste alle Buttons');
+            
+            for (let i = 0; i < 6; i++) {
+                setTimeout(() => {
+                    fetch('/test/button', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `id=${i}`
+                    }).catch(err => console.error(`Test Button ${i+1} fehlgeschlagen:`, err));
+                }, i * 500); // 500ms Abstand zwischen Tests
+            }
+            
+            setTimeout(() => {
+                configurator.updateStatusBar('Alle Button-Tests abgeschlossen');
+            }, 3000);
+        }
+        
+        function applyTemplate() {
+            const templateName = document.getElementById('templateSelect').value;
+            configurator.applyTemplate(templateName);
+        }
+        
+        function exportConfig() {
+            configurator.exportConfig();
+        }
+        
+        function importConfig() {
+            configurator.importConfig();
+        }
+        
+        function saveAsTemplate() {
+            configurator.saveAsTemplate();
+        }
+        
+        function handleImportFile(event) {
+            configurator.handleImportFile(event);
+        }
+        
+        function backupConfig() {
+            configurator.backupConfig();
+        }
+        
+        // Keyboard-Shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 's': // Strg+S: Speichern
+                        e.preventDefault();
+                        saveButtonConfig();
+                        break;
+                    case 'e': // Strg+E: Export
+                        e.preventDefault();
+                        exportConfig();
+                        break;
+                    case 't': // Strg+T: Test
+                        e.preventDefault();
+                        testButton();
+                        break;
+                    case 'r': // Strg+R: Reset
+                        e.preventDefault();
+                        resetButton();
+                        break;
+                }
+            }
+            
+            // Pfeil-Tasten für Button-Navigation
+            if (!e.ctrlKey && !e.altKey) {
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        if (configurator.currentButton > 0) {
+                            configurator.selectButton(configurator.currentButton - 1);
+                        }
+                        break;
+                    case 'ArrowRight':
+                        if (configurator.currentButton < 5) {
+                            configurator.selectButton(configurator.currentButton + 1);
+                        }
+                        break;
+                }
+            }
+        });
+        
+        // Initialisierung wenn Seite geladen
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 Initialisiere ESP32 Button-Konfigurator...');
+            configurator = new ButtonConfigurator();
+        });
+        
+        // Verbindungs-Check alle 30 Sekunden
+        setInterval(async () => {
+            try {
+                const response = await fetch('/api/status', { method: 'HEAD' });
+                if (response.ok) {
+                    configurator.updateStatusBar('Verbunden');
+                } else {
+                    configurator.updateStatusBar('Verbindung schwach');
+                }
+            } catch (error) {
+                configurator.updateStatusBar('ESP32 nicht erreichbar');
+            }
+        }, 30000);
+        
+        console.log('ESP32 Touch Panel Button-Konfigurator v2.0 geladen 🎛️');
+    </script>
+</body>
+</html>

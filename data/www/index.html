@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Touch Panel - Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+        
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+        
+        .status-ok { color: #2ecc71; }
+        .status-warning { color: #f39c12; }
+        .status-error { color: #e74c3c; }
+        
+        .navigation {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .nav-link {
+            display: inline-block;
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #2c3e50;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .nav-link.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-item {
+            padding: 15px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 10px;
+            text-align: center;
+            border-left: 4px solid #3498db;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-item:hover {
+            transform: scale(1.05);
+            border-left-color: #e74c3c;
+        }
+        
+        .stat-item strong {
+            display: block;
+            color: #2c3e50;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .stat-item span {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .button-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        
+        .button-status {
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid;
+            transition: all 0.3s ease;
+        }
+        
+        .button-status.active {
+            border-color: #2ecc71;
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            color: white;
+            box-shadow: 0 0 20px rgba(46, 204, 113, 0.4);
+        }
+        
+        .button-status.inactive {
+            border-color: #bdc3c7;
+            background: linear-gradient(135deg, #ecf0f1 0%, #bdc3c7 100%);
+            color: #2c3e50;
+        }
+        
+        .button-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .button-label {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .button-state {
+            font-size: 0.8em;
+            opacity: 0.8;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-primary { background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; }
+        .btn-success { background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); color: white; }
+        .btn-warning { background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: white; }
+        .btn-info { background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white; }
+        .btn-secondary { background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); color: white; }
+        
+        .file-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            transition: background 0.3s ease;
+        }
+        
+        .file-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .file-name {
+            font-weight: 500;
+        }
+        
+        .file-size {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: white;
+            font-size: 0.9em;
+            margin-top: 30px;
+        }
+        
+        #messageContainer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            max-width: 400px;
+        }
+        
+        .message {
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            animation: slideIn 0.3s ease;
+            position: relative;
+            cursor: pointer;
+        }
+        
+        .message.success { background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); }
+        .message.error { background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); }
+        .message.warning { background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); }
+        .message.info { background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .header h1 { font-size: 2em; }
+            .grid { grid-template-columns: 1fr; }
+            .navigation { flex-direction: column; align-items: center; }
+            .action-buttons { flex-direction: column; }
+            .status-info { flex-direction: column; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🎛️ ESP32 Touch Panel v2.0</h1>
+            <p>SPIFFS + Web-Konfiguration + Button-Templates</p>
+            <div class="status-info">
+                <span id="deviceId">Device ID: 5999</span>
+                <span id="connectionStatus" class="status-ok">● Verbunden</span>
+            </div>
+        </header>
+
+        <nav class="navigation">
+            <a href="index.html" class="nav-link active">📊 Dashboard</a>
+            <a href="button_config.html" class="nav-link">🎛️ Button-Konfiguration</a>
+        </nav>
+
+        <div class="grid">
+            <!-- System Status -->
+            <div class="card">
+                <h3>🖥️ System Status</h3>
+                <div class="stats">
+                    <div class="stat-item">
+                        <strong>Uptime</strong>
+                        <span id="uptime">12h 34m</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Freier Speicher</strong>
+                        <span id="freeHeap">234 KB</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>SPIFFS Speicher</strong>
+                        <span id="spiffsUsage">45% (67KB)</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Orientierung</strong>
+                        <span id="orientation">Landscape</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Button Status -->
+            <div class="card">
+                <h3>🎛️ Button Status</h3>
+                <div class="button-status-grid" id="buttonStatusGrid">
+                    <div class="button-status inactive">
+                        <div class="button-icon">💡</div>
+                        <div class="button-label">Wohnzimmer</div>
+                        <div class="button-state">Inaktiv</div>
+                    </div>
+                    <div class="button-status active">
+                        <div class="button-icon">🏠</div>
+                        <div class="button-label">Rollade</div>
+                        <div class="button-state">Aktiv</div>
+                    </div>
+                    <div class="button-status inactive">
+                        <div class="button-icon">🔘</div>
+                        <div class="button-label">Schalter</div>
+                        <div class="button-state">Inaktiv</div>
+                    </div>
+                    <div class="button-status inactive">
+                        <div class="button-icon">🔆</div>
+                        <div class="button-label">Dimmer</div>
+                        <div class="button-state">Inaktiv</div>
+                    </div>
+                    <div class="button-status active">
+                        <div class="button-icon">🌡️</div>
+                        <div class="button-label">Heizung</div>
+                        <div class="button-state">Aktiv</div>
+                    </div>
+                    <div class="button-status inactive">
+                        <div class="button-icon">💨</div>
+                        <div class="button-label">Lüftung</div>
+                        <div class="button-state">Inaktiv</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CSMA/CD Statistiken -->
+            <div class="card">
+                <h3>📡 CSMA/CD Kommunikation</h3>
+                <div class="stats">
+                    <div class="stat-item">
+                        <strong>Gesendete Telegramme</strong>
+                        <span id="totalSent">247</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Kollisionen erkannt</strong>
+                        <span id="totalCollisions">3</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Wiederholungen</strong>
+                        <span id="totalRetries">5</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Erfolgsrate</strong>
+                        <span id="successRate" class="status-ok">98.8%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Schnellaktionen -->
+            <div class="card">
+                <h3>⚡ Schnellaktionen</h3>
+                <div class="action-buttons">
+                    <button class="btn btn-success" onclick="testAllButtons()">
+                        🧪 Alle Buttons testen
+                    </button>
+                    <button class="btn btn-primary" onclick="sendTestTelegram()">
+                        📤 Test-Telegramm
+                    </button>
+                    <button class="btn btn-info" onclick="showSPIFFSInfo()">
+                        📁 SPIFFS Info
+                    </button>
+                    <button class="btn btn-warning" onclick="restartDevice()">
+                        🔄 Neustart
+                    </button>
+                </div>
+            </div>
+
+            <!-- SPIFFS Dateien -->
+            <div class="card">
+                <h3>📁 SPIFFS Dateien</h3>
+                <div class="file-list" id="fileList">
+                    <div class="file-item">
+                        <span class="file-name">📄 index.html</span>
+                        <span class="file-size">8.2 KB</span>
+                    </div>
+                    <div class="file-item">
+                        <span class="file-name">📄 button_config.html</span>
+                        <span class="file-size">15.8 KB</span>
+                    </div>
+                    <div class="file-item">
+                        <span class="file-name">📄 style.css</span>
+                        <span class="file-size">6.1 KB</span>
+                    </div>
+                    <div class="file-item">
+                        <span class="file-name">📄 app.js</span>
+                        <span class="file-size">4.3 KB</span>
+                    </div>
+                    <div class="file-item">
+                        <span class="file-name">⚙️ button_config.json</span>
+                        <span class="file-size">1.1 KB</span>
+                    </div>
+                    <div class="file-item">
+                        <span class="file-name">📋 templates.json</span>
+                        <span class="file-size">2.7 KB</span>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" onclick="refreshFileList()" style="margin-top: 15px;">
+                    🔄 Dateiliste aktualisieren
+                </button>
+            </div>
+        </div>
+			<!-- Zeit & Datum Steuerung -->
+			<div class="card">
+				<h3>🕐 Zeit & Datum</h3>
+				
+				<!-- Aktuelle Zeit Anzeige -->
+				<div style="text-align: center; margin-bottom: 20px;">
+					<div style="font-size: 2em; font-weight: bold; color: #007bff;" id="currentDateTime">
+						--:-- | --.--. ----
+					</div>
+					<div style="font-size: 0.9em; color: #6c757d;" id="lastTimeUpdate">
+						Letzte Aktualisierung: --
+					</div>
+				</div>
+				
+				<!-- Zeit Eingabe -->
+				<div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+					<div class="form-group">
+						<label>⏰ Zeit setzen:</label>
+						<input type="time" id="timeInput" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+					</div>
+					
+					<div class="form-group">
+						<label>📅 Datum setzen:</label>
+						<input type="date" id="dateInput" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+					</div>
+				</div>
+				
+				<!-- Zeit Buttons -->
+				<div class="action-buttons">
+					<button class="btn btn-primary" onclick="syncTimeFromBrowser()">
+						🔄 Browser-Zeit übernehmen
+					</button>
+					<button class="btn btn-success" onclick="setCustomTime()">
+						⏰ Zeit setzen
+					</button>
+					<button class="btn btn-info" onclick="refreshTime()">
+						🔄 Zeit aktualisieren
+					</button>
+				</div>
+				
+				<!-- Zeit-Status -->
+				<div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 0.9em;">
+					<div><strong>Zeit-Quelle:</strong> <span id="timeSource">Simuliert (ESP32 intern)</span></div>
+					<div><strong>Letztes Update:</strong> <span id="timeUpdateStatus">-</span></div>
+				</div>
+			</div>
+        <!-- Status Messages -->
+        <div id="messageContainer"></div>
+    </div>
+
+    <footer>
+        <p>ESP32 Touch Panel v2.0 | SPIFFS Dateisystem | Letztes Update: <span id="lastUpdate">-</span></p>
+    </footer>
+
+    <script>
+		async function refreshTime() {
+		try {
+			showMessage('🔄 Aktualisiere Zeit...', 'info', 2000);
+			
+			const response = await fetch('/api/time');
+			const timeData = await response.json();
+			
+			const dateResponse = await fetch('/api/date');
+			const dateData = await dateResponse.json();
+			
+			// Zeit/Datum-Anzeige aktualisieren
+			const timeStr = timeData.timeString || '--:--';
+			const dateStr = dateData.dateString || '--.--. ----';
+			
+			document.getElementById('currentDateTime').textContent = `${timeStr} | ${dateStr}`;
+			document.getElementById('lastTimeUpdate').textContent = `Letzte Aktualisierung: ${new Date().toLocaleTimeString()}`;
+			document.getElementById('timeUpdateStatus').textContent = `${new Date().toLocaleString()}`;
+			
+			// Input-Felder mit aktuellen Werten füllen
+			if (timeData.hour !== undefined && timeData.minute !== undefined) {
+				const timeInputValue = 
+					(timeData.hour < 10 ? '0' : '') + timeData.hour + ':' +
+					(timeData.minute < 10 ? '0' : '') + timeData.minute;
+				document.getElementById('timeInput').value = timeInputValue;
+			}
+			
+			if (dateData.year !== undefined && dateData.month !== undefined && dateData.day !== undefined) {
+				const dateInputValue = 
+					dateData.year + '-' +
+					(dateData.month < 10 ? '0' : '') + dateData.month + '-' +
+					(dateData.day < 10 ? '0' : '') + dateData.day;
+				document.getElementById('dateInput').value = dateInputValue;
+			}
+			
+		} catch (error) {
+			console.error('Zeit-Update fehlgeschlagen:', error);
+			showMessage('❌ Zeit-Update fehlgeschlagen: ' + error.message, 'error');
+		}
+	}
+
+	// Browser-Zeit auf ESP32 übertragen
+	async function syncTimeFromBrowser() {
+		try {
+			const now = new Date();
+			
+			showMessage('🔄 Übertrage Browser-Zeit auf ESP32...', 'info', 3000);
+			
+			// Zeit setzen
+			const timeResponse = await fetch('/api/time', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+				body: `hour=${now.getHours()}&minute=${now.getMinutes()}&second=${now.getSeconds()}`
+			});
+			
+			// Datum setzen
+			const dateResponse = await fetch('/api/date', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+				body: `day=${now.getDate()}&month=${now.getMonth() + 1}&year=${now.getFullYear()}`
+			});
+			
+			if (timeResponse.ok && dateResponse.ok) {
+				showMessage('✅ Browser-Zeit erfolgreich auf ESP32 übertragen!', 'success');
+				document.getElementById('timeSource').textContent = 'Browser-Zeit (synchronisiert)';
+				
+				// Zeit-Anzeige aktualisieren
+				setTimeout(refreshTime, 500);
+			} else {
+				throw new Error('Zeit-Übertragung fehlgeschlagen');
+			}
+			
+		} catch (error) {
+			console.error('Zeit-Synchronisation fehlgeschlagen:', error);
+			showMessage('❌ Zeit-Synchronisation fehlgeschlagen: ' + error.message, 'error');
+		}
+	}
+
+	// Benutzerdefinierte Zeit setzen
+	async function setCustomTime() {
+		try {
+			const timeInput = document.getElementById('timeInput').value;
+			const dateInput = document.getElementById('dateInput').value;
+			
+			if (!timeInput && !dateInput) {
+				showMessage('⚠️ Bitte geben Sie Zeit oder Datum ein', 'warning');
+				return;
+			}
+			
+			let timeSet = false;
+			let dateSet = false;
+			
+			// Zeit setzen falls eingegeben
+			if (timeInput) {
+				const timeResponse = await fetch('/api/time', {
+					method: 'POST',
+					headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+					body: `timeString=${timeInput}:00`
+				});
+				
+				if (timeResponse.ok) {
+					timeSet = true;
+				} else {
+					throw new Error('Zeit setzen fehlgeschlagen');
+				}
+			}
+			
+			// Datum setzen falls eingegeben
+			if (dateInput) {
+				// Format: YYYY-MM-DD zu DD.MM.YYYY
+				const dateParts = dateInput.split('-');
+				const formattedDate = `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}`;
+				
+				const dateResponse = await fetch('/api/date', {
+					method: 'POST',
+					headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+					body: `dateString=${formattedDate}`
+				});
+				
+				if (dateResponse.ok) {
+					dateSet = true;
+				} else {
+					throw new Error('Datum setzen fehlgeschlagen');
+				}
+			}
+			
+			// Erfolgsmeldung
+			if (timeSet && dateSet) {
+				showMessage('✅ Zeit und Datum erfolgreich gesetzt!', 'success');
+			} else if (timeSet) {
+				showMessage('✅ Zeit erfolgreich gesetzt!', 'success');
+			} else if (dateSet) {
+				showMessage('✅ Datum erfolgreich gesetzt!', 'success');
+			}
+			
+			document.getElementById('timeSource').textContent = 'Manuell gesetzt';
+			
+			// Zeit-Anzeige aktualisieren
+			setTimeout(refreshTime, 500);
+			
+		} catch (error) {
+			console.error('Zeit setzen fehlgeschlagen:', error);
+			showMessage('❌ Zeit setzen fehlgeschlagen: ' + error.message, 'error');
+		}
+	}
+
+	// Zeit automatisch alle 30 Sekunden aktualisieren
+	function startTimeAutoUpdate() {
+		// Erste Aktualisierung sofort
+		refreshTime();
+		
+		// Dann alle 30 Sekunden
+		setInterval(refreshTime, 30000);
+	}
+
+	// Zeit-Eingabefelder mit aktueller Browser-Zeit vorausfüllen
+	function prefillTimeInputs() {
+		const now = new Date();
+		
+		// Zeit-Input
+		const timeValue = 
+			(now.getHours() < 10 ? '0' : '') + now.getHours() + ':' +
+			(now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+		document.getElementById('timeInput').value = timeValue;
+		
+		// Datum-Input
+		const dateValue = 
+			now.getFullYear() + '-' +
+			((now.getMonth() + 1) < 10 ? '0' : '') + (now.getMonth() + 1) + '-' +
+			(now.getDate() < 10 ? '0' : '') + now.getDate();
+		document.getElementById('dateInput').value = dateValue;
+	}
+
+        // Nachrichten-System
+        function showMessage(message, type = 'info', duration = 5000) {
+            const container = document.getElementById('messageContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.innerHTML = `${message} <span style="float: right; cursor: pointer; font-weight: bold;" onclick="this.parentElement.remove()">&times;</span>`;
+            
+            container.appendChild(messageDiv);
+            
+            if (duration > 0) {
+                setTimeout(() => {
+                    if (messageDiv.parentNode) {
+                        messageDiv.remove();
+                    }
+                }, duration);
+            }
+        }
+
+        // Dashboard-Funktionen
+        function testAllButtons() {
+            showMessage('🧪 Teste alle 6 Buttons sequenziell...', 'info');
+            // Hier würde der Test-Code stehen
+        }
+
+        function sendTestTelegram() {
+            showMessage('📤 Test-Telegramm: ý5999.BTN.17.STATUS.1þ', 'info');
+            // Hier würde das Test-Telegramm gesendet
+        }
+
+        function showSPIFFSInfo() {
+            showMessage('📁 SPIFFS: 6 Dateien, 38.2 KB belegt von 150 KB (25.5%)', 'info');
+        }
+
+        function restartDevice() {
+            if (confirm('ESP32 wirklich neu starten?')) {
+                showMessage('🔄 Neustart wird eingeleitet...', 'warning');
+                // Hier würde der Neustart-Befehl gesendet
+            }
+        }
+
+        function refreshFileList() {
+            showMessage('🔄 Dateiliste wird aktualisiert...', 'info');
+            // Hier würde die Dateiliste neu geladen
+        }
+
+        function updateDashboard() {
+            // Hier würden die aktuellen Daten vom ESP32 abgerufen
+			document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+			
+			const uptime = Math.floor(Math.random() * 24) + "h " + Math.floor(Math.random() * 60) + "m";
+			document.getElementById('uptime').textContent = uptime;
+			
+			const freeHeap = Math.floor(Math.random() * 100 + 200) + " KB";
+			document.getElementById('freeHeap').textContent = freeHeap;
+			
+			// NEU: Zeit-Update
+			refreshTime();
+        }
+		// Beim Laden der Seite
+		window.addEventListener('load', () => {
+			// Bestehende Initialisierung...
+			updateDashboard();
+			
+			// NEU: Zeit-Funktionen initialisieren
+			startTimeAutoUpdate();
+			prefillTimeInputs();
+		});
+        // Auto-Update alle 5 Sekunden
+        setInterval(() => {
+            updateDashboard();
+        }, 5000);
+
+        // Initialer Update
+        updateDashboard();
+        
+        // Willkommensnachricht
+        setTimeout(() => {
+            showMessage('✅ ESP32 Touch Panel Dashboard erfolgreich geladen!', 'success', 3000);
+        }, 1000);
+    </script>
+</body>
+</html>

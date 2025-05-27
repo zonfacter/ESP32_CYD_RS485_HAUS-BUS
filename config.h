@@ -7,6 +7,8 @@
 #include <XPT2046_Touchscreen.h>
 #include <HardwareSerial.h>
 #include "Arduino.h"
+#include <FS.h>
+using namespace fs;  // <- Damit 'FS' statt 'fs::FS' funktioniert
 
 // Debug-Einstellungen
 #define DB_TX_HEX 0      // Hex-Ausgabe für gesendete Telegramme
@@ -84,12 +86,17 @@ extern XPT2046_Touchscreen touchscreen;
 #define PWM_RESOLUTION 8        // PWM-Auflösung
 #define DEFAULT_BACKLIGHT 100   // Standardhelligkeit
 
-// Display-Konfiguration - STATISCH für Kompilierung
+// Display-Konfiguration - KORRIGIERT für USB rechts
 #define PORTRAIT 0
 #define LANDSCAPE 1
 
-// Fallback-Orientierung für statische Kompilierung
-#define FALLBACK_ORIENTATION LANDSCAPE
+#define ROTATION_0   0   // Portrait
+#define ROTATION_90  1   // Landscape 90° (USB links)
+#define ROTATION_180 2   // Portrait 180°
+#define ROTATION_270 3   // Landscape 270° (USB rechts)
+
+// *** HIER: Standard-Orientierung auf USB rechts setzen ***
+#define FALLBACK_ORIENTATION ROTATION_270  // ← War vorher LANDSCAPE (1)
 #define SCREEN_ORIENTATION FALLBACK_ORIENTATION
 
 #if SCREEN_ORIENTATION == PORTRAIT

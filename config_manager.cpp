@@ -613,7 +613,7 @@ bool ConfigManager::saveCSMAConfig() {
 // Standard-Konfigurationen setzen
 void ConfigManager::setDefaultDeviceConfig() {
     device.deviceID = "5999";
-    device.orientation = 1; // Landscape
+    device.orientation = 3; // Landscape
     device.firmwareVersion = "2.0";
     device.hardwareVersion = "ESP32-CYD-RS485";
     device.buildDate = __DATE__ " " __TIME__;

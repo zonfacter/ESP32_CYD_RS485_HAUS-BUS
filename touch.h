@@ -15,4 +15,7 @@ void testTouch();
 // Zeichnet ein Kalibrierungskreuz
 void drawCalibrationPoint(int x, int y, uint16_t color);
 
+// Touch Wizard
+void touchCalibrationWizard();
+
 #endif // TOUCH_H

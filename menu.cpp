@@ -98,136 +98,69 @@ int checkButtonPress(int x, int y) {
 
 // Initialisiert die Buttons mit ihren Positionen und Farben
 void initButtons() {
-  // *** KORRIGIERT: Button-Layout mit Header-Offset, ohne Titel und Helligkeit ***
-  int headerOffset = HEADER_HEIGHT + 5;  // Nur Header + kleiner Abstand
-  int availableHeight = SCREEN_HEIGHT - headerOffset;  // Komplette verfügbare Höhe
-  
-  #if SCREEN_ORIENTATION == PORTRAIT
-    // Portrait: 2 Spalten x 3 Zeilen
-    buttonWidth = SCREEN_WIDTH / 2;
-    buttonHeight = availableHeight / 3;  // Volle Höhe nutzen
-    
-    // Button 1 (oben links)
-    buttons[0].x = 0;
-    buttons[0].y = headerOffset;
-    buttons[0].w = buttonWidth;
-    buttons[0].h = buttonHeight;
-    
-    // Button 2 (oben rechts)
-    buttons[1].x = buttonWidth;
-    buttons[1].y = headerOffset;
-    buttons[1].w = buttonWidth;
-    buttons[1].h = buttonHeight;
-    
-    // Button 3 (mitte links)
-    buttons[2].x = 0;
-    buttons[2].y = headerOffset + buttonHeight;
-    buttons[2].w = buttonWidth;
-    buttons[2].h = buttonHeight;
-    
-    // Button 4 (mitte rechts)
-    buttons[3].x = buttonWidth;
-    buttons[3].y = headerOffset + buttonHeight;
-    buttons[3].w = buttonWidth;
-    buttons[3].h = buttonHeight;
-    
-    // Button 5 (unten links)
-    buttons[4].x = 0;
-    buttons[4].y = headerOffset + buttonHeight * 2;
-    buttons[4].w = buttonWidth;
-    buttons[4].h = buttonHeight;
-    
-    // Button 6 (unten rechts)
-    buttons[5].x = buttonWidth;
-    buttons[5].y = headerOffset + buttonHeight * 2;
-    buttons[5].w = buttonWidth;
-    buttons[5].h = buttonHeight;
-  #else
-    // Landscape: 3 Spalten x 2 Zeilen
-    buttonWidth = SCREEN_WIDTH / 3;
-    buttonHeight = availableHeight / 2;  // Volle Höhe nutzen
-    
-    // Button 1 (oben links)
-    buttons[0].x = 0;
-    buttons[0].y = headerOffset;
-    buttons[0].w = buttonWidth;
-    buttons[0].h = buttonHeight;
-    
-    // Button 2 (oben mitte)
-    buttons[1].x = buttonWidth;
-    buttons[1].y = headerOffset;
-    buttons[1].w = buttonWidth;
-    buttons[1].h = buttonHeight;
-    
-    // Button 3 (oben rechts)
-    buttons[2].x = buttonWidth * 2;
-    buttons[2].y = headerOffset;
-    buttons[2].w = buttonWidth;
-    buttons[2].h = buttonHeight;
-    
-    // Button 4 (unten links)
-    buttons[3].x = 0;
-    buttons[3].y = headerOffset + buttonHeight;
-    buttons[3].w = buttonWidth;
-    buttons[3].h = buttonHeight;
-    
-    // Button 5 (unten mitte)
-    buttons[4].x = buttonWidth;
-    buttons[4].y = headerOffset + buttonHeight;
-    buttons[4].w = buttonWidth;
-    buttons[4].h = buttonHeight;
-    
-    // Button 6 (unten rechts)
-    buttons[5].x = buttonWidth * 2;
-    buttons[5].y = headerOffset + buttonHeight;
-    buttons[5].w = buttonWidth;
-    buttons[5].h = buttonHeight;
-  #endif
-  
-  // Button-Labels und Funktionen
-  buttons[0].label = "Taster 1";
-  buttons[0].instanceID = "17";
-  buttons[0].color = BUTTON_COLOR_INACTIVE;
-  buttons[0].textColor = TFT_WHITE;
-  buttons[0].pressed = false;
-  buttons[0].isActive = false;
-  
-  buttons[1].label = "Taster 2";
-  buttons[1].instanceID = "18";
-  buttons[1].color = BUTTON_COLOR_INACTIVE;
-  buttons[1].textColor = TFT_WHITE;
-  buttons[1].pressed = false;
-  buttons[1].isActive = false;
-  
-  buttons[2].label = "Taster 3";
-  buttons[2].instanceID = "19";
-  buttons[2].color = BUTTON_COLOR_INACTIVE;
-  buttons[2].textColor = TFT_WHITE;
-  buttons[2].pressed = false;
-  buttons[2].isActive = false;
-  
-  buttons[3].label = "Taster 4";
-  buttons[3].instanceID = "20";
-  buttons[3].color = BUTTON_COLOR_INACTIVE;
-  buttons[3].textColor = TFT_WHITE;
-  buttons[3].pressed = false;
-  buttons[3].isActive = false;
-  
-  buttons[4].label = "Taster 5";
-  buttons[4].instanceID = "21";
-  buttons[4].color = BUTTON_COLOR_INACTIVE;
-  buttons[4].textColor = TFT_WHITE;
-  buttons[4].pressed = false;
-  buttons[4].isActive = false;
-  
-  buttons[5].label = "Taster 6";
-  buttons[5].instanceID = "22";
-  buttons[5].color = BUTTON_COLOR_INACTIVE;
-  buttons[5].textColor = TFT_WHITE;
-  buttons[5].pressed = false;
-  buttons[5].isActive = false;
-}
+  int rotation = tft.getRotation();
+  int headerOffset = HEADER_HEIGHT + 5;
+  int availableHeight = SCREEN_HEIGHT - headerOffset;
 
+  if (rotation == 0 || rotation == 2) {
+    // 2x3 Layout für Portrait und Portrait 180°
+    buttonWidth = SCREEN_WIDTH / 2;
+    buttonHeight = availableHeight / 3;
+
+    for (int i = 0; i < NUM_BUTTONS; i++) {
+      int col = i % 2;
+      int row = i / 2;
+      int x = col * buttonWidth;
+      int y = headerOffset + row * buttonHeight;
+      if (rotation == 2) { // Spiegeln
+        x = SCREEN_WIDTH - x - buttonWidth;
+        y = SCREEN_HEIGHT - y - buttonHeight;
+      }
+      buttons[i].x = x;
+      buttons[i].y = y;
+      buttons[i].w = buttonWidth;
+      buttons[i].h = buttonHeight;
+    }
+  } else {
+    // 3x2 Layout für Landscape 90° und 270°
+    buttonWidth = SCREEN_WIDTH / 3;
+    buttonHeight = availableHeight / 2;
+
+    for (int i = 0; i < NUM_BUTTONS; i++) {
+      int col = i % 3;
+      int row = i / 3;
+      int x = col * buttonWidth;
+      int y = headerOffset + row * buttonHeight;
+      if (rotation == 3) { // Spiegeln X-Achse
+        x = SCREEN_WIDTH - x - buttonWidth;
+      }
+      buttons[i].x = x;
+      buttons[i].y = y;
+      buttons[i].w = buttonWidth;
+      buttons[i].h = buttonHeight;
+    }
+  }
+
+  // *** KORRIGIERT: Button-Labels und IDs richtig setzen ***
+  for (int i = 0; i < NUM_BUTTONS; i++) {
+    buttons[i].label = "Taster " + String(i + 1);
+    buttons[i].instanceID = String(17 + i);  // IDs 17-22
+    buttons[i].color = TFT_DARKGREY;         // Standard: Grau (inaktiv)
+    buttons[i].textColor = TFT_WHITE;        // Weiße Schrift
+    buttons[i].pressed = false;
+    buttons[i].isActive = false;             // Standard: inaktiv
+  }
+
+  #if DB_INFO == 1
+    Serial.println("=== Button-Initialisierung ===");
+    for (int i = 0; i < NUM_BUTTONS; i++) {
+      Serial.printf("Button %d: Label='%s', ID='%s', Pos=(%d,%d), Größe=(%dx%d)\n", 
+                    i+1, buttons[i].label.c_str(), buttons[i].instanceID.c_str(),
+                    buttons[i].x, buttons[i].y, buttons[i].w, buttons[i].h);
+    }
+    Serial.println("=============================");
+  #endif
+}
 // Zeigt das Hauptmenü an
 void showMenu() {
   tft.fillScreen(TFT_WHITE);

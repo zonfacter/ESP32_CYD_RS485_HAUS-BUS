@@ -118,8 +118,7 @@ private:
   // WiFi und Web-Interface (private)
   void startWiFiAP();
   void stopWiFi();
-  void startWebServer();
-  void stopWebServer();
+
 
 public:
   ServiceManager();
@@ -151,6 +150,10 @@ public:
   bool isWiFiActive();
   bool isWebServerActive();
   void handleWebServer();  // Für loop() Aufruf
+
+  void startWebServer();
+  void stopWebServer();
+
 };
 
 // Globale ServiceManager Instanz

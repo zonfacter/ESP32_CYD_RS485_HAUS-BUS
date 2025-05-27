@@ -11,7 +11,9 @@
 #include "touch.h"  // Für getTouchPoint()
 #include <EEPROM.h>
 #include <WiFi.h>
-
+#include "web_server_manager.h"
+#include "config_manager.h"
+#include "header_display.h"
 // Globale ServiceManager Instanz
 ServiceManager serviceManager;
 
@@ -512,6 +514,7 @@ void ServiceManager::onTestFunction() {
   tft.drawCentreString("TOUCH ZUM ZURÜCKKEHREN", SCREEN_WIDTH/2, SCREEN_HEIGHT-30, 1);
   
   // Warten auf Touch und Touch-Koordinaten anzeigen
+  // Warten auf Touch
   bool exitTest = false;
   while (!exitTest) {
     if (touchscreen.tirqTouched() && touchscreen.touched()) {
@@ -520,25 +523,20 @@ void ServiceManager::onTestFunction() {
       int x, y;
       getTouchPoint(&x, &y);
       
-      // Zurück-Button prüfen
-      if (y >= SCREEN_HEIGHT-40) {
+      // Touch-Kalibrierung
+      if (x >= 10 && x <= 160 && y >= 50 && y <= 90) {
+        touchCalibrationWizard();
         exitTest = true;
-        break;
       }
-      
-      // Touch-Koordinaten anzeigen
-      tft.fillRect(10, 185, SCREEN_WIDTH-20, 20, TFT_LIGHTGREY);
-      tft.setTextColor(TFT_BLACK);
-      String coords = "Touch: X=" + String(x) + ", Y=" + String(y);
-      tft.drawCentreString(coords, SCREEN_WIDTH/2, 190, 1);
-      
-      #if DB_INFO == 1
-        Serial.print("DEBUG: Touch-Test - X: ");
-        Serial.print(x);
-        Serial.print(", Y: ");
-        Serial.println(y);
-      #endif
-      
+      // Button-Test  
+      else if (x >= 170 && x <= 320 && y >= 50 && y <= 90) {
+        testTouch();
+        exitTest = true;
+      }
+      // Zurück
+      else if (y >= SCREEN_HEIGHT-50) {
+        exitTest = true;
+      }
       // Warten bis losgelassen
       while (touchscreen.touched()) {
         delay(10);
@@ -612,67 +610,44 @@ void ServiceManager::toggleOrientation() {
   onToggleOrientation();
 }
 
-void ServiceManager::applyOrientation(int orientation) {
-  // Orientierung sofort anwenden
-  if (orientation == LANDSCAPE) {
-    tft.setRotation(1);
-    touchscreen.setRotation(1);
-    
-    #if DB_INFO == 1
-      Serial.println("DEBUG: Orientierung auf LANDSCAPE angewendet");
-    #endif
-  } else {
-    tft.setRotation(0);
-    touchscreen.setRotation(0);
-    
-    #if DB_INFO == 1
-      Serial.println("DEBUG: Orientierung auf PORTRAIT angewendet");
-    #endif
-  }
-  
-  // Globale Variablen aktualisieren falls nötig
-  // (SCREEN_WIDTH und SCREEN_HEIGHT werden automatisch durch TFT_eSPI angepasst)
+void ServiceManager::applyOrientation(int rotation) {
+  rotation %= 4;
+  tft.setRotation(rotation);
+  currentOrientation = rotation;
+  configManager.device.orientation = rotation;
+  configChanged = true;
+
+  initButtons();
+  drawButtons();
+  drawHeader();
 }
 
 void ServiceManager::showOrientationPreview() {
   currentState = SERVICE_ORIENTATION;
-  
-  // Sofortige Anwendung der neuen Orientierung für Preview
-  applyOrientation(currentOrientation);
-  
+
+  // Neue Orientierung anwenden
+  applyOrientation(currentOrientation);  // ✅ Nur aufrufen, nicht definieren
+
   // Preview-Screen anzeigen
   tft.fillScreen(TFT_WHITE);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  
-  // Header
+
   String orientationName = (currentOrientation == LANDSCAPE) ? "LANDSCAPE" : "PORTRAIT";
   tft.drawCentreString("ORIENTIERUNG: " + orientationName, SCREEN_WIDTH/2, 10, 2);
   tft.drawLine(0, 30, SCREEN_WIDTH, 30, TFT_BLACK);
-  
-  // Dimensionen anzeigen
+
   String dimText = "Auflösung: " + String(SCREEN_WIDTH) + " x " + String(SCREEN_HEIGHT);
   tft.drawCentreString(dimText, SCREEN_WIDTH/2, 50, 2);
-  
-  // Test-Rechtecke in den Ecken
+
+  // Testrechtecke
   tft.fillRect(10, 70, 50, 30, TFT_RED);
   tft.fillRect(SCREEN_WIDTH - 60, 70, 50, 30, TFT_GREEN);
   tft.fillRect(10, SCREEN_HEIGHT - 50, 50, 30, TFT_BLUE);
   tft.fillRect(SCREEN_WIDTH - 60, SCREEN_HEIGHT - 50, 50, 30, TFT_YELLOW);
-  
-  // Ecken beschriften
-  tft.setTextColor(TFT_WHITE);
-  tft.drawCentreString("1", 35, 80, 2);
-  tft.drawCentreString("2", SCREEN_WIDTH - 35, 80, 2);
-  tft.drawCentreString("3", 35, SCREEN_HEIGHT - 40, 2);
-  tft.drawCentreString("4", SCREEN_WIDTH - 35, SCREEN_HEIGHT - 40, 2);
-  
-  // Instruktionen
-  tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  tft.drawCentreString("Touch um zurückzukehren", SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 2);
-  
-  // Kurze Verzögerung für visuelles Feedback
-  delay(1000);
+
+  drawServiceMenu();  // zurück zur Menüanzeige
 }
+
 
 void ServiceManager::onWiFiToggle() {
   if (wifiActive) {
@@ -687,62 +662,71 @@ void ServiceManager::onWiFiToggle() {
 }
 
 void ServiceManager::onWebConfig() {
-  if (!wifiActive) {
-    // WiFi erst aktivieren
-    startWiFiAP();
-    initServiceButtons();
-    drawServiceMenu();
-    return;
-  }
-  
-  if (!webServerActive) {
-    startWebServer();
-  }
-  
-  // Web-Config Anzeige
-  tft.fillScreen(TFT_WHITE);
-  tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  tft.drawCentreString("WEB-KONFIGURATION", SCREEN_WIDTH/2, 10, 2);
-  tft.drawLine(0, 30, SCREEN_WIDTH, 30, TFT_BLACK);
-  
-  if (wifiActive) {
-    IPAddress ip = WiFi.softAPIP();
-    String ipText = "IP: " + ip.toString();
-    tft.drawCentreString(ipText, SCREEN_WIDTH/2, 50, 2);
-    tft.drawCentreString("http://" + ip.toString(), SCREEN_WIDTH/2, 80, 2);
-    
-    tft.setTextColor(TFT_DARKGREEN, TFT_WHITE);
-    tft.drawCentreString("Web-Server AKTIV", SCREEN_WIDTH/2, 110, 2);
-    
-    tft.setTextColor(TFT_BLACK, TFT_WHITE);
-    tft.drawCentreString("SSID: " + wifiSSID, SCREEN_WIDTH/2, 140, 1);
-    tft.drawCentreString("Passwort: " + wifiPassword, SCREEN_WIDTH/2, 155, 1);
-    
-    tft.drawCentreString("Konfiguration über Browser", SCREEN_WIDTH/2, 180, 1);
-    tft.drawCentreString("möglich", SCREEN_WIDTH/2, 195, 1);
-    
-    tft.drawCentreString("Touch zum Zurückkehren", SCREEN_WIDTH/2, 220, 1);
-  } else {
-    tft.setTextColor(TFT_RED, TFT_WHITE);
-    tft.drawCentreString("WiFi nicht aktiv!", SCREEN_WIDTH/2, 50, 2);
-    tft.setTextColor(TFT_BLACK, TFT_WHITE);
-    tft.drawCentreString("Aktivieren Sie zuerst WiFi", SCREEN_WIDTH/2, 80, 1);
-  }
-  
-  // Warten auf Touch
-  unsigned long startTime = millis();
-  bool touched = false;
-  
-  while (!touched && (millis() - startTime < 10000)) {  // 10 Sekunden Timeout
-    if (touchscreen.tirqTouched() && touchscreen.touched()) {
-      touched = true;
-      delay(200);  // Entprellung
+    if (!wifiActive) {
+        // WiFi erst aktivieren
+        startWiFiAP();
+        initServiceButtons();
+        drawServiceMenu();
+        return;
     }
-    delay(50);
-  }
-  
-  // Zurück zum Service-Menü
-  drawServiceMenu();
+    
+    if (!webServerActive) {
+        startWebServer();
+    }
+    
+    // Web-Config Anzeige
+    tft.fillScreen(TFT_WHITE);
+    tft.setTextColor(TFT_BLACK, TFT_WHITE);
+    tft.drawCentreString("WEB-KONFIGURATION", SCREEN_WIDTH/2, 10, 2);
+    tft.drawLine(0, 30, SCREEN_WIDTH, 30, TFT_BLACK);
+    
+    if (wifiActive && webServerActive) {
+        IPAddress ip = WiFi.softAPIP();
+        String ipText = "IP: " + ip.toString();
+        tft.drawCentreString(ipText, SCREEN_WIDTH/2, 50, 2);
+        tft.drawCentreString("http://" + ip.toString(), SCREEN_WIDTH/2, 80, 2);
+        
+        tft.setTextColor(TFT_DARKGREEN, TFT_WHITE);
+        tft.drawCentreString("Web-Server AKTIV", SCREEN_WIDTH/2, 110, 2);
+        
+        tft.setTextColor(TFT_BLACK, TFT_WHITE);
+        tft.drawCentreString("SSID: " + wifiSSID, SCREEN_WIDTH/2, 140, 1);
+        tft.drawCentreString("Passwort: " + wifiPassword, SCREEN_WIDTH/2, 155, 1);
+        
+        tft.drawCentreString("Konfiguration über Browser", SCREEN_WIDTH/2, 180, 1);
+        tft.drawCentreString("möglich", SCREEN_WIDTH/2, 195, 1);
+        
+        // SPIFFS-Status anzeigen
+        size_t totalBytes = SPIFFS.totalBytes();
+        size_t usedBytes = SPIFFS.usedBytes();
+        float usage = (float)usedBytes / totalBytes * 100.0;
+        
+        tft.setTextColor(TFT_BLUE, TFT_WHITE);
+        tft.drawCentreString("SPIFFS: " + String(usage, 1) + "% belegt", SCREEN_WIDTH/2, 215, 1);
+        
+        tft.setTextColor(TFT_BLACK, TFT_WHITE);
+        tft.drawCentreString("Touch zum Zurückkehren", SCREEN_WIDTH/2, 235, 1);
+    } else {
+        tft.setTextColor(TFT_RED, TFT_WHITE);
+        tft.drawCentreString("Web-Server nicht verfügbar!", SCREEN_WIDTH/2, 50, 2);
+        tft.setTextColor(TFT_BLACK, TFT_WHITE);
+        tft.drawCentreString("Aktivieren Sie zuerst WiFi", SCREEN_WIDTH/2, 80, 1);
+    }
+    
+    // Warten auf Touch
+    unsigned long startTime = millis();
+    bool touched = false;
+    
+    while (!touched && (millis() - startTime < 10000)) {  // 10 Sekunden Timeout
+        if (touchscreen.tirqTouched() && touchscreen.touched()) {
+            touched = true;
+            delay(200);  // Entprellung
+        }
+        delay(50);
+    }
+    
+    // Zurück zum Service-Menü
+    drawServiceMenu();
 }
 
 void ServiceManager::onSaveAndExit() {
@@ -803,31 +787,15 @@ void ServiceManager::stopWiFi() {
 }
 
 void ServiceManager::startWebServer() {
-  if (!wifiActive) {
-    #if DB_INFO == 1
-      Serial.println("ERROR: Kann Web-Server nicht starten - WiFi nicht aktiv");
-    #endif
-    return;
-  }
-  
-  webServerActive = true;
-  
-  #if DB_INFO == 1
-    Serial.println("DEBUG: Web-Server gestartet (vereinfacht)");
-  #endif
-  
-  // Hier würde der eigentliche Web-Server Code stehen
-  // Für Version 1.50 ist dies nur ein Placeholder
+    if (!webServerManager.isRunning()) {
+        webServerManager.begin();
+    }
 }
 
 void ServiceManager::stopWebServer() {
-  webServerActive = false;
-  
-  #if DB_INFO == 1
-    Serial.println("DEBUG: Web-Server gestoppt");
-  #endif
-  
-  // Hier würde der Web-Server gestoppt werden
+    if (webServerManager.isRunning()) {
+        webServerManager.stop();
+    }
 }
 
 void ServiceManager::handleServiceTelegram(String action, String params) {
@@ -1044,14 +1012,6 @@ bool ServiceManager::isWebServerActive() {
   return webServerActive;
 }
 
-void ServiceManager::handleWebServer() {
-  // Vereinfacht - kein WebServer.handleClient() für jetzt
-  if (webServerActive) {
-    // Placeholder für Web-Server Handling
-    // Hier würde normalerweise server.handleClient() aufgerufen werden
-  }
-}
-
 // *** DEVICE ID EDITOR IMPLEMENTATION ***
 
 void ServiceManager::drawDeviceIDEditor() {
@@ -1060,7 +1020,6 @@ void ServiceManager::drawDeviceIDEditor() {
   
   // Header
   tft.drawCentreString("DEVICE ID EDITOR", SCREEN_WIDTH/2, SCREEN_HEIGHT - 10, 1);
-  //tft.drawLine(0, 30, SCREEN_WIDTH, 30, TFT_BLACK);
   
   // Device ID Anzeige
   drawDeviceIDDisplay();
@@ -1099,7 +1058,6 @@ void ServiceManager::drawDeviceIDDisplay() {
   String posText = "Pos: " + String(editPosition + 1) + "/4";
   tft.drawCentreString(posText, SCREEN_WIDTH/2, charY + 35, 1);
 }  
-
 
 void ServiceManager::drawNumpad() {
   for (int i = 0; i < NUM_NUMPAD_BUTTONS; i++) {
@@ -1189,11 +1147,6 @@ void ServiceManager::updateDeviceIDDigit(char digit) {
       Serial.print(" gesetzt. Neue ID: ");
       Serial.println(editDeviceID);
     #endif
-    
-    // Automatisch zur nächsten Position
-    //if (editPosition < 3) {
-    //  editPosition++;
-    //}
   }
 }
 
@@ -1322,4 +1275,4 @@ void handleServiceTouch(int x, int y, bool touched) {
 
 void handleWebServerLoop() {
   serviceManager.handleWebServer();
-}
+  }
