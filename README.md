@@ -251,6 +251,285 @@ Alle Kommunikation erfolgt über strukturierte Telegramme:
 ```
 
 **Beispiel**: `ý5999.LBN.16.SET_MBR.75þ` setzt die Hintergrundbeleuchtung auf 75%.
+# 📡 **Vollständige Telegramm-Befehlsreferenz ESP32 Touch Panel v2.0**
+
+## 📋 **Telegramm-Format**
+```
+[START_BYTE] DEVICE_ID.FUNCTION.INSTANCE_ID.ACTION.PARAMS [END_BYTE]
+```
+- **START_BYTE**: `0xFD` (ý)
+- **END_BYTE**: `0xFE` (þ)
+- **DEVICE_ID**: 4-stellige Nummer (Standard: `5999`, konfigurierbar)
+
+---
+
+## 🎛️ **1. BUTTON-STEUERUNG (Empfangen)**
+
+### **LED-Aktivierung (Button-Status setzen)**
+```bash
+# Button aktivieren (grün/weiß mit Helligkeit)
+ý5999.LED.49.ON.100þ    # Button 1 → Weiß hell (100%)
+ý5999.LED.50.ON.75þ     # Button 2 → Weiß gedimmt (75%)
+ý5999.LED.51.ON.50þ     # Button 3 → Weiß mittel (50%)
+ý5999.LED.52.ON.25þ     # Button 4 → Weiß dunkel (25%)
+ý5999.LED.53.ON.1þ      # Button 5 → Weiß minimal (1%)
+
+# Button deaktivieren (grau)
+ý5999.LED.49.ON.0þ      # Button 1 → Grau (inaktiv)
+ý5999.LED.50.OFF.0þ     # Button 2 → Grau (alternativ)
+ý5999.LED.51.OFF.þ      # Button 3 → Grau (ohne Parameter)
+
+# Alle Buttons deaktivieren
+ý5999.LED.49.OFF.0þ
+ý5999.LED.50.OFF.0þ
+ý5999.LED.51.OFF.0þ
+ý5999.LED.52.OFF.0þ
+ý5999.LED.53.OFF.0þ
+ý5999.LED.54.OFF.0þ
+```
+
+### **LED-Button-Zuordnung:**
+| LED-ID | Button | Position (Landscape) | Position (Portrait) |
+|--------|--------|---------------------|---------------------|
+| LED.49 | Button 1 | Oben Links | Oben Links |
+| LED.50 | Button 2 | Oben Mitte | Oben Rechts |
+| LED.51 | Button 3 | Oben Rechts | Mitte Links |
+| LED.52 | Button 4 | Unten Links | Mitte Rechts |
+| LED.53 | Button 5 | Unten Mitte | Unten Links |
+| LED.54 | Button 6 | Unten Rechts | Unten Rechts |
+
+---
+
+## 🔆 **2. HINTERGRUNDBELEUCHTUNG (Empfangen)**
+
+### **Helligkeit einstellen**
+```bash
+# Helligkeit setzen (0-100%)
+ý5999.LBN.16.SET_MBR.100þ   # 100% Helligkeit (maximum)
+ý5999.LBN.16.SET_MBR.75þ    # 75% Helligkeit
+ý5999.LBN.16.SET_MBR.50þ    # 50% Helligkeit
+ý5999.LBN.16.SET_MBR.25þ    # 25% Helligkeit
+ý5999.LBN.16.SET_MBR.0þ     # 0% Helligkeit (aus)
+
+# Status abfragen
+ý5999.LBN.16.GET.þ          # Aktuellen Helligkeitswert abfragen
+```
+
+---
+
+## ⚙️ **3. SYSTEM-STEUERUNG (Empfangen)**
+
+### **Service-Manager Steuerung**
+```bash
+# Service-Modus aktivieren/deaktivieren
+ý5999.SYS.1.SERVICE.1þ      # Service-Modus aktivieren
+ý5999.SYS.1.SERVICE.0þ      # Service-Modus deaktivieren
+
+# WiFi Access Point steuern
+ý5999.SYS.1.WIFI.1þ         # WiFi AP aktivieren
+ý5999.SYS.1.WIFI.0þ         # WiFi AP deaktivieren
+
+# Web-Server steuern
+ý5999.SYS.1.WEBSERVER.1þ    # Web-Server aktivieren
+ý5999.SYS.1.WEBSERVER.0þ    # Web-Server deaktivieren
+
+# System-Reset
+ý5999.SYS.1.RESET.0þ        # ESP32 neu starten (nach 2 Sekunden)
+```
+
+### **Device-Konfiguration**
+```bash
+# Device ID ändern (4-stellig, nur Ziffern)
+ý5999.SYS.1.DEVICE_ID.6000þ # Neue Device ID: 6000
+ý5999.SYS.1.DEVICE_ID.1234þ # Neue Device ID: 1234
+
+# Orientierung ändern
+ý5999.SYS.1.ORIENTATION.0þ  # Portrait-Modus
+ý5999.SYS.1.ORIENTATION.1þ  # Landscape-Modus
+```
+
+---
+
+## 🕐 **4. ZEIT & DATUM (Empfangen)**
+
+### **Zeit setzen**
+```bash
+# Zeit setzen (Format: HHMMSS)
+ý5999.TIME.1.SET.143000þ    # 14:30:00 Uhr
+ý5999.TIME.1.SET.090000þ    # 09:00:00 Uhr
+ý5999.TIME.1.SET.235959þ    # 23:59:59 Uhr
+
+# Zeit abfragen
+ý5999.TIME.1.GET.þ          # Aktuelle Zeit abfragen
+```
+
+### **Datum setzen**
+```bash
+# Datum setzen (Format: DDMMYYYY)
+ý5999.DATE.1.SET.26052025þ  # 26.05.2025
+ý5999.DATE.1.SET.01012025þ  # 01.01.2025
+ý5999.DATE.1.SET.31122025þ  # 31.12.2025
+
+# Datum abfragen
+ý5999.DATE.1.GET.þ          # Aktuelles Datum abfragen
+```
+
+---
+
+## 📤 **5. GESENDETE TELEGRAMME (ESP32 → Zentrale)**
+
+### **Button-Events (Touch-Ereignisse)**
+```bash
+# Button gedrückt (steigende Flanke)
+ý5999.BTN.17.STATUS.1þ      # Button 1 gedrückt
+ý5999.BTN.18.STATUS.1þ      # Button 2 gedrückt  
+ý5999.BTN.19.STATUS.1þ      # Button 3 gedrückt
+ý5999.BTN.20.STATUS.1þ      # Button 4 gedrückt
+ý5999.BTN.21.STATUS.1þ      # Button 5 gedrückt
+ý5999.BTN.22.STATUS.1þ      # Button 6 gedrückt
+
+# Button losgelassen (fallende Flanke)
+ý5999.BTN.17.STATUS.0þ      # Button 1 losgelassen
+ý5999.BTN.18.STATUS.0þ      # Button 2 losgelassen
+ý5999.BTN.19.STATUS.0þ      # Button 3 losgelassen
+ý5999.BTN.20.STATUS.0þ      # Button 4 losgelassen
+ý5999.BTN.21.STATUS.0þ      # Button 5 losgelassen
+ý5999.BTN.22.STATUS.0þ      # Button 6 losgelassen
+```
+
+### **Status-Meldungen (automatisch alle 23 Sekunden)**
+```bash
+# Hintergrundbeleuchtung-Status
+ý5999.LBN.16.STATUS.100þ    # Aktuelle Helligkeit: 100%
+ý5999.LBN.16.STATUS.75þ     # Aktuelle Helligkeit: 75%
+ý5999.LBN.16.STATUS.0þ      # Aktuelle Helligkeit: 0%
+```
+
+### **Zeit/Datum-Antworten (auf GET-Anfragen)**
+```bash
+# Zeit-Status (Format: HHMMSS)
+ý5999.TIME.1.STATUS.143000þ # Aktuelle Zeit: 14:30:00
+
+# Datum-Status (Format: DDMMYYYY)  
+ý5999.DATE.1.STATUS.26052025þ # Aktuelles Datum: 26.05.2025
+```
+
+---
+
+## 🚫 **6. FEHLENDE/NICHT UNTERSTÜTZTE BEFEHLE**
+
+### **Service-Modus Einschränkungen**
+```bash
+# ❌ Diese Befehle werden im Service-Modus BLOCKIERT:
+ý5999.LED.49.ON.100þ        # LED-Steuerung blockiert
+ý5999.LBN.16.SET_MBR.50þ    # Backlight-Steuerung blockiert  
+ý5999.BTN.17.STATUS.1þ      # Button-Events blockiert
+
+# ✅ Diese Befehle funktionieren IMMER:
+ý5999.SYS.1.SERVICE.0þ      # Service-Modus deaktivieren
+ý5999.TIME.1.SET.143000þ    # Zeit setzen
+ý5999.DATE.1.SET.26052025þ  # Datum setzen
+ý5999.SYS.1.RESET.0þ        # System-Reset
+```
+
+---
+
+## 🧪 **7. TEST-TELEGRAMME FÜR DEBUGGING**
+
+### **Kompletter Button-Test**
+```bash
+# Sequenzieller Test aller Buttons
+ý5999.LED.49.ON.100þ && sleep 1 && ý5999.LED.49.OFF.0þ
+ý5999.LED.50.ON.100þ && sleep 1 && ý5999.LED.50.OFF.0þ
+ý5999.LED.51.ON.100þ && sleep 1 && ý5999.LED.51.OFF.0þ
+ý5999.LED.52.ON.100þ && sleep 1 && ý5999.LED.52.OFF.0þ
+ý5999.LED.53.ON.100þ && sleep 1 && ý5999.LED.53.OFF.0þ
+ý5999.LED.54.ON.100þ && sleep 1 && ý5999.LED.54.OFF.0þ
+```
+
+### **Helligkeits-Rampe**
+```bash
+# Helligkeit von 0% auf 100% in 25%-Schritten
+ý5999.LBN.16.SET_MBR.0þ     # 0%
+ý5999.LBN.16.SET_MBR.25þ    # 25%
+ý5999.LBN.16.SET_MBR.50þ    # 50%
+ý5999.LBN.16.SET_MBR.75þ    # 75%
+ý5999.LBN.16.SET_MBR.100þ   # 100%
+```
+
+### **Service-Manager Funktionstest**
+```bash
+# Service-Modus aktivieren → Konfiguration → Deaktivieren
+ý5999.SYS.1.SERVICE.1þ      # Service-Modus an
+ý5999.SYS.1.WIFI.1þ         # WiFi aktivieren
+ý5999.SYS.1.WEBSERVER.1þ    # Web-Server starten
+ý5999.SYS.1.SERVICE.0þ      # Service-Modus aus
+```
+
+---
+
+## 📊 **8. KOMMUNIKATIONS-PARAMETER**
+
+### **RS485-Konfiguration**
+- **Baudrate**: 57600 bps
+- **Format**: 8E1 (8 Datenbits, Even Parity, 1 Stoppbit)
+- **Hardware**: UART2 (RX=Pin 22, TX=Pin 21)
+
+### **CSMA/CD-Parameter**
+- **Bus Idle Time**: 10ms (konfigurierbar)
+- **Collision Detection**: 5ms
+- **Max. Retries**: 5 (konfigurierbar)
+- **Sendepuffer**: 10 Telegramme
+
+### **Prioritäten**
+- **Kritisch (0-1)**: System-Befehle, Button-Events
+- **Normal (5)**: LED-Steuerung, Backlight
+- **Niedrig (7-9)**: Status-Meldungen
+
+---
+
+## ⚡ **9. ERWEITERTE BEFEHLE (Web-API)**
+
+### **Nur über Web-Interface verfügbar**
+```bash
+# HTTP POST zu http://192.168.4.1/api/
+POST /api/button           # Remote Button-Steuerung
+POST /api/brightness       # Helligkeit über Web
+POST /api/orientation      # Orientierung über Web
+POST /api/config           # Vollständige Konfiguration
+GET  /api/status           # Live-System-Status
+```
+
+---
+
+## 🎯 **Anwendungsbeispiele**
+
+### **Hausautomation**
+```bash
+# Wohnzimmer-Beleuchtung über Button 1
+ý5999.LED.49.ON.100þ        # Licht-Icon aktivieren
+# → Benutzer drückt Button 1
+# ← ý5999.BTN.17.STATUS.1þ  # Button-Event empfangen
+# → Licht einschalten
+
+# Rollade über Button 3  
+ý5999.LED.51.ON.50þ         # Rollade-Icon halbhell
+# → Benutzer drückt Button 3
+# ← ý5999.BTN.19.STATUS.1þ  # Rollade-Befehl
+```
+
+### **Status-Dashboard**
+```bash
+# Alle Buttons als Status-Anzeige nutzen
+ý5999.LED.49.ON.100þ        # Heizung AN (grün)
+ý5999.LED.50.ON.0þ          # Lüftung AUS (grau)
+ý5999.LED.51.ON.75þ         # Rollade teilweise (orange)
+ý5999.LED.52.ON.100þ        # Alarm scharf (rot)
+ý5999.LED.53.ON.50þ         # Modus teilaktiv
+ý5999.LED.54.ON.100þ        # System OK (grün)
+```
+
+Das ESP32 Touch Panel unterstützt damit **alle wesentlichen Hausautomations-Funktionen** über das robuste CSMA/CD-RS485-Protokoll! 🏠🚀
 
 ### UART-Konfiguration
 
