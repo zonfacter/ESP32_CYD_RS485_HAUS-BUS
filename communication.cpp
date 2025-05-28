@@ -7,6 +7,7 @@
  * - Sendepuffer mit automatischer Wiederholung
  * - Backoff-Algorithmus bei Kollisionen
  * - Priorisierung von Nachrichten
+ * - *** NEU: Button-Touch-Priorität für LED-Steuerung ***
  */
 #include "communication.h"
 #include "backlight.h"
@@ -52,6 +53,74 @@ int sendQueueCount = 0;
 unsigned long totalSent = 0;
 unsigned long totalCollisions = 0;
 unsigned long totalRetries = 0;
+
+// *** NEU: Button-Touch-Priorität Variablen ***
+// Diese müssen extern deklariert werden, damit sie in main INO zugänglich sind
+extern struct ButtonTiming {
+  bool touchActive;
+  unsigned long touchStartTime;
+  bool status1Sent;
+  int activeButtonIndex;
+} buttonTiming;
+
+// *** NEU: Pending LED State für Buttons ***
+struct PendingLedState {
+  bool hasPending;
+  uint16_t pendingColor;
+  bool pendingActive;
+};
+
+PendingLedState pendingLedStates[NUM_BUTTONS];
+
+// *** NEU: Hilfsfunktion - Prüft ob Button gerade lokal gedrückt wird ***
+bool isButtonLocallyPressed(int buttonIndex) {
+  return (buttonTiming.touchActive && 
+          buttonTiming.activeButtonIndex == buttonIndex);
+}
+
+// *** NEU: Hilfsfunktion - Speichert LED-Status für später ***
+void setPendingLedState(int buttonIndex, uint16_t color, bool active) {
+  if (buttonIndex >= 0 && buttonIndex < NUM_BUTTONS) {
+    pendingLedStates[buttonIndex].hasPending = true;
+    pendingLedStates[buttonIndex].pendingColor = color;
+    pendingLedStates[buttonIndex].pendingActive = active;
+    
+    #if DB_RX_INFO == 1
+      Serial.print("DEBUG: LED-Status für Button ");
+      Serial.print(buttonIndex + 1);
+      Serial.println(" gespeichert (lokaler Touch aktiv)");
+    #endif
+  }
+}
+
+// *** NEU: Hilfsfunktion - Wendet gespeicherten LED-Status an ***
+void applyPendingLedState(int buttonIndex) {
+  if (buttonIndex >= 0 && buttonIndex < NUM_BUTTONS && 
+      pendingLedStates[buttonIndex].hasPending) {
+    
+    buttons[buttonIndex].color = pendingLedStates[buttonIndex].pendingColor;
+    buttons[buttonIndex].isActive = pendingLedStates[buttonIndex].pendingActive;
+    redrawButton(buttonIndex);
+    
+    // Pending-Status zurücksetzen
+    pendingLedStates[buttonIndex].hasPending = false;
+    
+    #if DB_RX_INFO == 1
+      Serial.print("DEBUG: Gespeicherter LED-Status für Button ");
+      Serial.print(buttonIndex + 1);
+      Serial.println(" angewendet");
+    #endif
+  }
+}
+
+// *** NEU: Öffentliche Funktion - Pending LED States anwenden (für main INO) ***
+void applyAllPendingLedStates() {
+  for (int i = 0; i < NUM_BUTTONS; i++) {
+    if (pendingLedStates[i].hasPending) {
+      applyPendingLedState(i);
+    }
+  }
+}
 
 /**
  * Prüft, ob der Bus frei ist (Carrier Sense)
@@ -213,6 +282,13 @@ void setupCommunication() {
   // Zufallsgenerator initialisieren
   randomSeed(analogRead(A0) + millis());
   
+  // *** NEU: Pending LED States initialisieren ***
+  for (int i = 0; i < NUM_BUTTONS; i++) {
+    pendingLedStates[i].hasPending = false;
+    pendingLedStates[i].pendingColor = TFT_DARKGREY;
+    pendingLedStates[i].pendingActive = false;
+  }
+  
   #if DB_INFO == 1
     Serial.println("\n=== CSMA/CD RS485-Kommunikation ===");
     Serial.println("UART0: USB-Debug (115200, 8N1)");
@@ -226,6 +302,7 @@ void setupCommunication() {
     Serial.println(" ms");
     Serial.print("Sendepuffer-Größe: ");
     Serial.println(SEND_QUEUE_SIZE);
+    Serial.println("NEU: Button-Touch-Priorität für LED-Steuerung");
     Serial.println("CSMA/CD initialisiert");
   #endif
   
@@ -561,11 +638,7 @@ void updateCommunication() {
 }
 
 /**
- * Vollständige processTelegram() Funktion mit korrigierter Device ID Verwendung
- */
-/**
- * ERSETZE in communication.cpp die processTelegram() Funktion
- * Mit Service-Mode Filterung für LED-Telegramme
+ * *** KORRIGIERTE processTelegram() Funktion mit Button-Touch-Priorität ***
  */
 void processTelegram(String telegramStr) {
   // Überprüfen, ob das Telegramm das richtige Format hat
@@ -716,12 +789,44 @@ void processTelegram(String telegramStr) {
     }
   }
   else if (function == "LED") {
-    // LED-Steuerung (nur im Normal-Modus, bereits durch Service-Check blockiert)
+    // *** KORRIGIERTE LED-Steuerung mit Button-Touch-Priorität ***
     int ledId = instanceId.toInt();
     if (ledId >= 49 && ledId <= 54) {  // LED-IDs 49-54
       int buttonIndex = ledId - 49;    // Button-Index 0-5 (Button 1-6)
       
       if (buttonIndex >= 0 && buttonIndex < NUM_BUTTONS) {
+        
+        // *** NEUE LOGIK: Prüfe ob Button gerade lokal gedrückt wird ***
+        if (isButtonLocallyPressed(buttonIndex)) {
+          #if DB_RX_INFO == 1
+            Serial.print("DEBUG: LED-Telegramm für Button ");
+            Serial.print(buttonIndex + 1);
+            Serial.println(" empfangen, aber Button ist lokal aktiv - speichere für später");
+          #endif
+          
+          // Button ist gerade lokal aktiv - speichere LED-Status für später
+          if (action == "ON") {
+            int brightness = params.toInt();
+            brightness = constrain(brightness, 0, 100);
+            
+            if (brightness > 0) {
+              // Helligkeit > 0 → Weiß mit entsprechender Helligkeit
+              uint8_t level = map(brightness, 0, 100, 0, 255);
+              uint16_t whiteColor = tft.color565(level, level, level);
+              setPendingLedState(buttonIndex, whiteColor, true);
+            } else {
+              // Helligkeit = 0 → Grau (deaktiviert)
+              setPendingLedState(buttonIndex, TFT_DARKGREY, false);
+            }
+          } else if (action == "OFF") {
+            setPendingLedState(buttonIndex, TFT_DARKGREY, false);
+          }
+          
+          // NICHT sofort anwenden - wird nach Button-Release angewendet
+          return;
+        }
+        
+        // *** NORMALE LED-Verarbeitung (Button nicht lokal aktiv) ***
         if (action == "ON") {
           int brightness = params.toInt();
           brightness = constrain(brightness, 0, 100);
@@ -843,4 +948,3 @@ void printTelegramHex(String telegram) {
   }
   Serial.println();
 }
-

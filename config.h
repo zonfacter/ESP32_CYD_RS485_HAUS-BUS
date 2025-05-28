@@ -95,14 +95,15 @@ extern XPT2046_Touchscreen touchscreen;
 #define ROTATION_180 2   // Portrait 180°
 #define ROTATION_270 3   // Landscape 270° (USB rechts)
 
-// *** HIER: Standard-Orientierung auf USB rechts setzen ***
-#define FALLBACK_ORIENTATION ROTATION_270  // ← War vorher LANDSCAPE (1)
-#define SCREEN_ORIENTATION FALLBACK_ORIENTATION
+#define SCREEN_ORIENTATION ROTATION_180       // Direkt PORTRAIT (0) setzen
 
-#if SCREEN_ORIENTATION == PORTRAIT
+// *** KORRIGIERTE If-Bedingung ***
+#if SCREEN_ORIENTATION == ROTATION_0 || SCREEN_ORIENTATION == ROTATION_180 || SCREEN_ORIENTATION == PORTRAIT
+  // Hochformat
   #define SCREEN_WIDTH 240
   #define SCREEN_HEIGHT 320
 #else 
+  // Querformat
   #define SCREEN_WIDTH 320
   #define SCREEN_HEIGHT 240
 #endif

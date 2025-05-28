@@ -1,8 +1,9 @@
 /**
- * header_display.h - Version 1.60
+ * header_display.h - Version 1.60 - KORRIGIERT für alle Rotationen
  * 
  * Header-Display System für ESP32 Touch-Interface
  * - 20px Header mit Zeit, Datum, Device ID, Service-Icon
+ * - Automatische Positionierung je nach TFT-Rotation
  * - Telegramm-Steuerung für Zeit/Datum
  * - Service-Icon Touch-Aktivierung
  */
@@ -15,16 +16,9 @@
 // Header-Konstanten
 #define HEADER_HEIGHT 20
 #define SERVICE_ICON_SIZE 18
-#define SERVICE_ICON_Y 1
 
 #define SERVICE_TOUCH_AREA_WIDTH 60   
 #define SERVICE_TOUCH_AREA_HEIGHT 20  
-#define SERVICE_TOUCH_Y 0
-
-/*
-#define SERVICE_ICON_X (SCREEN_WIDTH - SERVICE_ICON_SIZE - 2)
-#define SERVICE_TOUCH_X (SCREEN_WIDTH - SERVICE_TOUCH_AREA_WIDTH)
-*/
 
 // Header-Funktionen
 void setupHeaderDisplay();
@@ -32,6 +26,12 @@ void drawHeader();
 void updateHeaderTime();
 void drawServiceIcon(bool active = false);
 bool checkServiceIconTouch(int x, int y);
+
+// *** NEU: Positionierungs-Hilfsfunktionen ***
+int getHeaderY();                    // Header Y-Position je nach Rotation
+int getButtonAreaY();               // Button-Bereich Y-Position  
+int getAvailableButtonHeight();     // Verfügbare Höhe für Buttons
+int getHeaderOffset();              // Header-Offset für menu.cpp
 
 // Zeit-Funktionen (simuliert - da keine RTC)
 struct TimeInfo {

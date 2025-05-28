@@ -4,8 +4,7 @@
 
 #include "config.h"
 
-// Initialisiert das Display
+// Funktionsdeklarationen
 void setupDisplay();
 
 #endif // DISPLAY_H
-

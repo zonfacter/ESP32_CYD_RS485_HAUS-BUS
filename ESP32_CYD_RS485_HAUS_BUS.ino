@@ -1,9 +1,10 @@
 /**
- * ESP32_CYD_RS485_HAUS_BUS.ino - Version 1.50 mit Button-basiertem Service-Touch
+ * ESP32_CYD_RS485_HAUS_BUS.ino - Version 1.60 mit korrigierter Button-Verarbeitung
  * 
  * Features: 
- * - 5-Sekunden Service-Touch über langen Button-Press
- * - Kein Display-Flackern mehr
+ * - Timing-basierte Button-Verarbeitung (50ms Verzögerung für STATUS.1)
+ * - 10-Sekunden Timeout mit automatischem STATUS.0
+ * - Service-Touch über Service-Icon
  * - CSMA/CD + Touch-Interface
  */
 
@@ -18,8 +19,31 @@
 #include <EEPROM.h>
 #include "header_display.h"
 
-// Timing für Hintergrundbeleuchtungs-Status
+// *** NEU: Display-Kalibrierung (nur für Inbetriebnahme) ***
+#include "display_calibration.h"
+
+// *** NUR DAS TFT-OBJEKT DEFINIEREN ***
+TFT_eSPI tft = TFT_eSPI();
+
+// Timing für Hintergrundbeleuchtungs-Status  
 unsigned long lastBacklightStatusTime = 0;
+
+// *** NEU: Button-Timing Variablen ***
+struct ButtonTiming {
+  bool touchActive;
+  unsigned long touchStartTime;
+  bool status1Sent;
+  int activeButtonIndex;
+};
+
+ButtonTiming buttonTiming = {false, 0, false, -1};
+
+// *** NEU: Externe Funktion aus communication.cpp ***
+extern void applyAllPendingLedStates();
+
+// Timing-Konstanten
+const unsigned long BUTTON_CONFIRM_DELAY = 50;    // 50ms Verzögerung für STATUS.1
+const unsigned long BUTTON_MAX_TIMEOUT = 10000;   // 10 Sekunden maximale Druckzeit
 
 void setup() {
   Serial.begin(115200);
@@ -32,8 +56,27 @@ void setup() {
     Serial.println("Hardware: Separate UART2 RS485 mit CSMA/CD");
     Serial.println("LED-Button-Zuordnung: LED 49-54 → Button 1-6");
     Serial.println("NEU: Header-Display mit Zeit/Datum/Device ID/Service-Icon");
+    Serial.println("NEU: Timing-basierte Button-Verarbeitung (50ms + 10s Timeout)");
   #endif
   
+  // *** DEBUG: Config-Werte prüfen ***
+  Serial.println("=== CONFIG DEBUG ===");
+  Serial.print("SCREEN_ORIENTATION: "); Serial.println(SCREEN_ORIENTATION);
+  Serial.print("SCREEN_WIDTH: "); Serial.println(SCREEN_WIDTH);
+  Serial.print("SCREEN_HEIGHT: "); Serial.println(SCREEN_HEIGHT);
+  
+  // *** NEU: DISPLAY-KALIBRIERUNG (vor allem anderen!) ***
+  #ifdef DISPLAY_CALIBRATION_H
+    startDisplayCalibration();
+    
+    // Optional: Warten auf Bestätigung vor normalem Start
+    Serial.println("Drücken Sie Enter um mit normalem Betrieb fortzufahren...");
+    while (!Serial.available()) {
+      delay(100);
+    }
+    Serial.readString(); // Input lesen
+  #endif
+
   // *** NEU: Service-Manager initialisieren (lädt gespeicherte Konfiguration) ***
   setupServiceManager();
   
@@ -58,21 +101,33 @@ void setup() {
   
   // Initialisiere den Touchscreen
   setupTouch();
-
+  
   // Initialisiere die Button-IDs
   initializeButtons();
   
-  // Initialisiere das Display
-  setupDisplay();
+  // Initialisiere das Display (nur falls Kalibrierung nicht lief)
+  #ifndef DISPLAY_CALIBRATION_H
+    setupDisplay();
+  #endif
+  
+  // *** ERZWINGE PORTRAIT NACH ALLEM ***
+  Serial.println("=== ERZWINGE PORTRAIT ===");
+  tft.setRotation(SCREEN_ORIENTATION);
+  Serial.print("Nach setRotation - TFT Rotation: "); 
+  Serial.println(tft.getRotation());
+  Serial.print("TFT Größe: "); 
+  Serial.print(tft.width()); 
+  Serial.print("x"); 
+  Serial.println(tft.height());
 
   // Anzeige einiger Infos
   tft.fillScreen(TFT_WHITE);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   tft.drawCentreString("ESP32 ST7789 mit Header-Display", SCREEN_WIDTH/2, 40, 2);
-  tft.drawCentreString("Version 1.60 + Zeit/Datum/Service", SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 2);
+  tft.drawCentreString("Version 1.60 + Timing-Buttons", SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 2);
   tft.drawCentreString("Initialisierung...", SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 20, 1);
   tft.drawCentreString("Device ID: " + serviceManager.getDeviceID(), SCREEN_WIDTH/2, SCREEN_HEIGHT - 50, 1);
-  tft.drawCentreString("Service: Header-Icon Touch", SCREEN_WIDTH/2, SCREEN_HEIGHT - 30, 1);
+  tft.drawCentreString("Button: 50ms + 10s Timeout", SCREEN_WIDTH/2, SCREEN_HEIGHT - 30, 1);
   
   // Erste Statusmeldung der Hintergrundbeleuchtung
   sendBacklightStatus();
@@ -90,6 +145,9 @@ void loop() {
   
   // Service-Manager Update
   updateServiceManager();
+  
+  // *** NEU: Button-Timing verwalten ***
+  updateButtonTiming();
   
   // Header-Zeit aktualisieren (alle 1000ms)
   static unsigned long lastHeaderUpdate = 0;
@@ -148,64 +206,16 @@ void loop() {
       return;
     }
     
-    // *** NORMALE BUTTON-VERARBEITUNG ***
-    int buttonPressed = checkButtonPress(x, y);
+    // *** NEUE TIMING-BASIERTE BUTTON-VERARBEITUNG ***
+    handleButtonTouch(x, y);
     
-    if (buttonPressed >= 0) {
-      #if DB_INFO == 1
-        Serial.print("DEBUG: Button gedrückt: ");
-        Serial.print(buttons[buttonPressed].label);
-        Serial.print(" (ID: ");
-        Serial.print(buttons[buttonPressed].instanceID);
-        Serial.println(")");
-      #endif
-      
-      // Sofort bei Berührung senden (Steigende Flanke)
-      if (!buttons[buttonPressed].pressed) {  // Nur wenn vorher nicht gedrückt
-        buttons[buttonPressed].pressed = true;
-        
-        // STEIGENDE FLANKE: Sofort senden
-        sendTelegram("BTN", buttons[buttonPressed].instanceID, "STATUS", "1");
-        
-        // Button visuell als gedrückt anzeigen (grün hinterlegen)
-        setButtonActive(buttonPressed, true);
-        
-        #if DB_INFO == 1
-          Serial.println("DEBUG: STEIGENDE FLANKE - Telegramm STATUS.1 gesendet");
-        #endif
-      }
-      
-      // Warte, bis der Touchscreen losgelassen wird
-      while (touchscreen.touched()) {
-        delay(10);
-        
-        // Während des Wartens die Kommunikation weiter verwalten
-        updateCommunication();
-        updateServiceManager();
-      }
-      
-      // FALLENDE FLANKE: Beim Loslassen senden
-      if (buttons[buttonPressed].pressed) {  // Nur wenn vorher gedrückt
-        buttons[buttonPressed].pressed = false;
-        
-        // FALLENDE FLANKE: Beim Loslassen senden
-        sendTelegram("BTN", buttons[buttonPressed].instanceID, "STATUS", "0");
-        
-        #if DB_INFO == 1
-          Serial.println("DEBUG: FALLENDE FLANKE - Telegramm STATUS.0 gesendet");
-        #endif
-        
-        // Button auf inaktiv (grau) setzen nach Loslassen
-        setButtonActive(buttonPressed, false);
-        
-        #if DB_INFO == 1
-          Serial.print("DEBUG: Button ");
-          Serial.print(buttonPressed);
-          Serial.println(" nach Loslassen auf grau gesetzt");
-        #endif
-      }
-    }
   } else {
+    // *** Touch nicht aktiv - prüfe ob Button-Timing läuft ***
+    if (buttonTiming.touchActive) {
+      // Touch wurde losgelassen
+      handleButtonRelease();
+    }
+    
     // Auch ohne Touch Service-Manager updaten
     if (serviceManager.isServiceMode()) {
       handleServiceTouch(0, 0, false);  // Touch = false
@@ -218,6 +228,172 @@ void loop() {
     printCommunicationStats();
     lastStatsOutput = millis();
   }
+}
+
+// *** NEUE FUNKTION: Timing-basierte Button-Touch-Verarbeitung ***
+void handleButtonTouch(int x, int y) {
+  int buttonPressed = checkButtonPress(x, y);
+  
+  if (buttonPressed >= 0) {
+    // Prüfen, ob es ein neuer Button-Touch ist
+    if (!buttonTiming.touchActive || buttonTiming.activeButtonIndex != buttonPressed) {
+      
+      #if DB_INFO == 1
+        Serial.print("DEBUG: Button ");
+        Serial.print(buttonPressed + 1);
+        Serial.print(" (");
+        Serial.print(buttons[buttonPressed].label);
+        Serial.print(" - ID: ");
+        Serial.print(buttons[buttonPressed].instanceID);
+        Serial.println(") berührt - starte Timing");
+      #endif
+      
+      // Neuer Button-Touch
+      buttonTiming.touchActive = true;
+      buttonTiming.touchStartTime = millis();
+      buttonTiming.status1Sent = false;
+      buttonTiming.activeButtonIndex = buttonPressed;
+      
+      // Button sofort visuell als aktiv anzeigen (grün)
+      setButtonActive(buttonPressed, true);
+      
+      #if DB_INFO == 1
+        Serial.println("DEBUG: Button visuell aktiviert, warte 50ms für STATUS.1");
+      #endif
+    }
+  }
+}
+
+// *** NEUE FUNKTION: Button-Release-Verarbeitung ***
+void handleButtonRelease() {
+  if (buttonTiming.touchActive && buttonTiming.activeButtonIndex >= 0) {
+    
+    #if DB_INFO == 1
+      Serial.print("DEBUG: Button ");
+      Serial.print(buttonTiming.activeButtonIndex + 1);
+      Serial.println(" losgelassen");
+    #endif
+    
+    // FALLENDE FLANKE: STATUS.0 senden (nur wenn STATUS.1 gesendet wurde)
+    if (buttonTiming.status1Sent) {
+      sendTelegram("BTN", buttons[buttonTiming.activeButtonIndex].instanceID, "STATUS", "0");
+      
+      #if DB_INFO == 1
+        Serial.println("DEBUG: FALLENDE FLANKE - Telegramm STATUS.0 gesendet");
+      #endif
+    }
+    
+    // Button visuell deaktivieren (grau)
+    setButtonActive(buttonTiming.activeButtonIndex, false);
+    
+    // Button-Status zurücksetzen
+    buttons[buttonTiming.activeButtonIndex].pressed = false;
+    
+    #if DB_INFO == 1
+      Serial.print("DEBUG: Button ");
+      Serial.print(buttonTiming.activeButtonIndex + 1);
+      Serial.println(" deaktiviert und zurückgesetzt");
+    #endif
+    
+    // *** NEU: Pending LED States anwenden ***
+    applyAllPendingLedStates();
+    
+    // Timing zurücksetzen
+    resetButtonTiming();
+  }
+}
+
+// *** NEUE FUNKTION: Button-Timing Update (in loop() aufgerufen) ***
+void updateButtonTiming() {
+  if (!buttonTiming.touchActive) {
+    return; // Kein aktiver Button-Touch
+  }
+  
+  unsigned long elapsed = millis() - buttonTiming.touchStartTime;
+  
+  // *** PHASE 1: Nach 50ms STATUS.1 senden ***
+  if (elapsed >= BUTTON_CONFIRM_DELAY && !buttonTiming.status1Sent) {
+    
+    #if DB_INFO == 1
+      Serial.println("DEBUG: 50ms erreicht - sende STATUS.1");
+    #endif
+    
+    // STEIGENDE FLANKE: STATUS.1 senden
+    sendTelegram("BTN", buttons[buttonTiming.activeButtonIndex].instanceID, "STATUS", "1");
+    
+    // Button als gedrückt markieren
+    buttons[buttonTiming.activeButtonIndex].pressed = true;
+    buttonTiming.status1Sent = true;
+    
+    #if DB_INFO == 1
+      Serial.println("DEBUG: STEIGENDE FLANKE - Telegramm STATUS.1 gesendet");
+    #endif
+  }
+  
+  // *** PHASE 2: Nach 10 Sekunden Timeout ***
+  if (elapsed >= BUTTON_MAX_TIMEOUT) {
+    
+    #if DB_INFO == 1
+      Serial.println("DEBUG: 10-Sekunden Timeout erreicht - forciere STATUS.0");
+    #endif
+    
+    // Timeout erreicht - forciere STATUS.0
+    if (buttonTiming.status1Sent) {
+      sendTelegram("BTN", buttons[buttonTiming.activeButtonIndex].instanceID, "STATUS", "0");
+      
+      #if DB_INFO == 1
+        Serial.println("DEBUG: TIMEOUT - Telegramm STATUS.0 gesendet");
+      #endif
+    }
+    
+    // Button visuell deaktivieren
+    setButtonActive(buttonTiming.activeButtonIndex, false);
+    buttons[buttonTiming.activeButtonIndex].pressed = false;
+    
+    #if DB_INFO == 1
+      Serial.print("DEBUG: Button ");
+      Serial.print(buttonTiming.activeButtonIndex + 1);
+      Serial.println(" nach Timeout zurückgesetzt");
+    #endif
+    
+    // *** NEU: Pending LED States anwenden ***
+    applyAllPendingLedStates();
+    
+    // Timeout-Warnung anzeigen (optional)
+    showTimeoutWarning();
+    
+    // Timing zurücksetzen
+    resetButtonTiming();
+  }
+}
+
+// *** NEUE FUNKTION: Button-Timing zurücksetzen ***
+void resetButtonTiming() {
+  buttonTiming.touchActive = false;
+  buttonTiming.touchStartTime = 0;
+  buttonTiming.status1Sent = false;
+  buttonTiming.activeButtonIndex = -1;
+  
+  #if DB_INFO == 1
+    Serial.println("DEBUG: Button-Timing zurückgesetzt");
+  #endif
+}
+
+// *** NEUE FUNKTION: Timeout-Warnung anzeigen ***
+void showTimeoutWarning() {
+  #if DB_INFO == 1
+    Serial.println("DEBUG: Zeige Timeout-Warnung");
+  #endif
+  
+  // Kurze visuelle Warnung am unteren Bildschirmrand
+  tft.fillRect(0, SCREEN_HEIGHT - 30, SCREEN_WIDTH, 30, TFT_ORANGE);
+  tft.setTextColor(TFT_BLACK);
+  tft.drawCentreString("Button-Timeout (10s erreicht)", SCREEN_WIDTH/2, SCREEN_HEIGHT - 20, 1);
+  
+  delay(1000); // 1 Sekunde anzeigen
+  
+  // Warnung entfernen - zurück zum normalen Menü
+  showMenu();
 }
 
 void initializeButtons() {
@@ -239,7 +415,7 @@ void initializeButtons() {
   Serial.println("Button 6 (Index 5) → BTN.22 ↔ LED.54");
   Serial.println("============================");
   Serial.println("INFO: Service-Icon Touch (rechts oben) = Service-Menü");
-  Serial.println("INFO: Service-Menü → Orientierung umschalten testen");
+  Serial.println("INFO: Button-Timing: 50ms Verzögerung + 10s Timeout");
 }
 
 void showStartupScreen() {
@@ -248,7 +424,7 @@ void showStartupScreen() {
   
   // Header
   tft.drawCentreString("ESP32 Touch Panel", SCREEN_WIDTH/2, 20, 2);
-  tft.drawCentreString("v1.50 + Button-Service", SCREEN_WIDTH/2, 45, 2);
+  tft.drawCentreString("v1.60 + Timing-Buttons", SCREEN_WIDTH/2, 45, 2);
   
   // Status-Informationen
   tft.drawCentreString("Initialisierung...", SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 20, 2);
@@ -262,247 +438,22 @@ void showStartupScreen() {
   String orientInfo = "Orientierung: " + String(serviceManager.getOrientation() == LANDSCAPE ? "Landscape" : "Portrait");
   tft.drawCentreString(orientInfo, SCREEN_WIDTH/2, SCREEN_HEIGHT - 45, 1);
   
-  // Service-Hinweis
-  tft.drawCentreString("Langer Button-Press (5s) = Service", SCREEN_WIDTH/2, SCREEN_HEIGHT - 20, 1);
+  // Button-Timing Info
+  tft.drawCentreString("Button: 50ms Delay + 10s Timeout", SCREEN_WIDTH/2, SCREEN_HEIGHT - 20, 1);
 }
 
-
-// *** NEUE FUNKTION: Button mit Service-Option ***
-void handleButtonWithServiceOption(int x, int y) {
-  int buttonPressed = checkButtonPress(x, y);
-  
-  if (buttonPressed >= 0) {
-    #if DB_INFO == 1
-      Serial.print("DEBUG: Button ");
-      Serial.print(buttonPressed + 1);
-      Serial.print(" (");
-      Serial.print(buttons[buttonPressed].label);
-      Serial.println(") berührt - starte Timing");
-    #endif
-    
-    // *** TIMING-SYSTEM: Kurz vs. Lang ***
-    unsigned long touchStartTime = millis();
-    bool serviceActivationStarted = false;
-    bool serviceManagerActivated = false;
-    
-    // Button visuell als gedrückt anzeigen
-    bool wasActive = buttons[buttonPressed].isActive;
-    setButtonActive(buttonPressed, true);
-    
-    // *** TOUCH-SCHLEIFE mit Timing ***
-    while (touchscreen.touched()) {
-      unsigned long elapsed = millis() - touchStartTime;
-      
-      // *** PHASE 1: 0-2s = Normale Button-Vorbereitung ***
-      if (elapsed < 2000) {
-        // Noch keine Aktion, warten
-        delay(10);
-        updateCommunication();
-      }
-      // *** PHASE 2: 2-5s = Service-Aktivierung läuft ***
-      else if (elapsed >= 2000 && elapsed < 5000) {
-        if (!serviceActivationStarted) {
-          // Service-Aktivierung starten
-          serviceActivationStarted = true;
-          
-          #if DB_INFO == 1
-            Serial.println("DEBUG: 2s erreicht - Progress-Bar wird gestartet");
-          #endif
-          
-          // Progress-Bar manuell zeichnen
-          drawServiceProgressBar(elapsed - 2000, 3000); // 0-3000ms Progress
-        } else {
-          // Progress-Bar aktualisieren
-          drawServiceProgressBar(elapsed - 2000, 3000);
-        }
-        
-        delay(10);
-        updateCommunication();
-      }
-      // *** PHASE 3: 5s+ = Service-Manager aktivieren ***
-      else if (elapsed >= 5000 && !serviceManagerActivated) {
-        #if DB_INFO == 1
-          Serial.println("DEBUG: 5s erreicht - Service-Manager wird DIREKT aktiviert!");
-        #endif
-        
-        // *** DIREKTE SERVICE-MANAGER AKTIVIERUNG ***
-        serviceManager.enterServiceMode();
-        serviceManagerActivated = true;
-        
-        // Warten bis Touch losgelassen
-        while (touchscreen.touched()) {
-          delay(10);
-          updateCommunication();
-        }
-        
-        #if DB_INFO == 1
-          Serial.println("DEBUG: Touch losgelassen - Service-Manager ist aktiv");
-        #endif
-        
-        return; // Service-Manager übernimmt vollständig
-      } else if (elapsed >= 5000) {
-        // Service-Manager ist bereits aktiviert, weiter warten
-        delay(10);
-        updateCommunication();
-      }
-    }
-    
-    // *** TOUCH LOSGELASSEN - Entscheidung treffen ***
-    unsigned long totalTime = millis() - touchStartTime;
-    
-    if (totalTime < 2000) {
-      // *** KURZER TOUCH (< 2s): Normale Button-Funktion ***
-      #if DB_INFO == 1
-        Serial.print("DEBUG: Kurzer Touch (");
-        Serial.print(totalTime);
-        Serial.println("ms) - normale Button-Funktion");
-      #endif
-      
-      // Normale Button-Verarbeitung
-      buttons[buttonPressed].pressed = true;
-      sendTelegram("BTN", buttons[buttonPressed].instanceID, "STATUS", "1");
-      
-      delay(100); // Kurze visuelle Bestätigung
-      
-      if (!wasActive) {
-        setButtonActive(buttonPressed, false);
-      }
-      
-      // Test-Button neu zeichnen
-      tft.fillRect(SCREEN_WIDTH - 60, 5, 55, 30, TFT_BLUE);
-      tft.setTextColor(TFT_WHITE);
-      tft.drawCentreString("TEST", SCREEN_WIDTH - 32, 15, 1);
-      
-      buttons[buttonPressed].pressed = false;
-      sendTelegram("BTN", buttons[buttonPressed].instanceID, "STATUS", "0");
-      
-    } else if (totalTime >= 2000 && totalTime < 5000) {
-      // *** MITTLERER TOUCH (2-5s): Service-Aktivierung abgebrochen ***
-      #if DB_INFO == 1
-        Serial.print("DEBUG: Mittlerer Touch (");
-        Serial.print(totalTime);
-        Serial.println("ms) - Service-Aktivierung abgebrochen");
-      #endif
-      
-      // Button wieder normal
-      if (!wasActive) {
-        setButtonActive(buttonPressed, false);
-      }
-      
-      // Progress-Bar entfernen und zurück zum Menü
-      showMenu();
-    }
-    // *** LANGER TOUCH (5s+): Service-Manager wurde bereits aktiviert ***
-    // Nichts mehr zu tun, Service-Manager ist aktiv
-    
-  } else {
-    #if DB_INFO == 1
-      Serial.println("DEBUG: Touch außerhalb aller Buttons");
-    #endif
-  }
-}
-
-
-void drawServiceProgressBar(unsigned long elapsed, unsigned long duration) {
-  int percent = (elapsed * 100) / duration;
-  percent = constrain(percent, 0, 100);
-  
-  int barWidth = SCREEN_WIDTH - 20;
-  int barHeight = 20;
-  int barX = 10;
-  int barY = SCREEN_HEIGHT - 30;
-  
-  // Hintergrund löschen
-  tft.fillRect(0, barY - 20, SCREEN_WIDTH, 50, TFT_WHITE);
-  
-  // Text
-  tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  tft.drawCentreString("Service-Modus aktivieren...", SCREEN_WIDTH/2, barY - 15, 1);
-  
-  // Progress-Bar Rahmen
-  tft.drawRect(barX, barY, barWidth, barHeight, TFT_BLACK);
-  
-  // Progress-Bar Füllung
-  int fillWidth = (barWidth - 2) * percent / 100;
-  if (fillWidth > 0) {
-    uint16_t color = TFT_GREEN;
-    if (percent < 50) color = TFT_YELLOW;
-    if (percent < 25) color = TFT_RED;
-    
-    tft.fillRect(barX + 1, barY + 1, fillWidth, barHeight - 2, color);
-  }
-  
-  // Zeit-Anzeige
-  int secondsRemaining = (duration - elapsed) / 1000 + 1;
-  secondsRemaining = max(secondsRemaining, 0);
-  
-  String timeText = String(secondsRemaining) + "s";
-  tft.drawCentreString(timeText, SCREEN_WIDTH/2, barY + 5, 1);
-  
-  #if DB_INFO == 1
-    static int lastPercent = -1;
-    if (percent != lastPercent && percent % 20 == 0) { // Alle 20% loggen
-      Serial.print("DEBUG: Progress: ");
-      Serial.print(percent);
-      Serial.print("% (");
-      Serial.print(elapsed);
-      Serial.print("/");
-      Serial.print(duration);
-      Serial.println("ms)");
-      lastPercent = percent;
-    }
-  #endif
-}
-
-// *** VEREINFACHTE handleNormalTouch() - Backup-Funktion ***
-void handleNormalTouch(int x, int y) {
-  // Fallback-Funktion falls handleButtonWithServiceOption() nicht funktioniert
-  
-  // Test-Button prüfen
-  if (x >= SCREEN_WIDTH - 60 && x <= SCREEN_WIDTH - 5 && y >= 5 && y <= 35) {
-    testTouch();
-    return;
-  }
-  
-  // Button-Press prüfen
-  int buttonPressed = checkButtonPress(x, y);
-  
-  if (buttonPressed >= 0) {
-    #if DB_INFO == 1
-      Serial.print("DEBUG: Fallback - Normaler Button gedrückt: ");
-      Serial.print(buttons[buttonPressed].label);
-    #endif
-    
-    // Einfache Button-Verarbeitung ohne Service-Touch
-    buttons[buttonPressed].pressed = true;
-    sendTelegram("BTN", buttons[buttonPressed].instanceID, "STATUS", "1");
-    
-    bool wasActive = buttons[buttonPressed].isActive;
-    setButtonActive(buttonPressed, true);
-    
-    // Warte bis Touch losgelassen
-    while (touchscreen.touched()) {
-      delay(10);
-      updateCommunication();
-    }
-    
-    if (!wasActive) {
-      setButtonActive(buttonPressed, false);
-    }
-    
-    // UI-Elemente neu zeichnen
-    redrawUIElements();
-    
-    buttons[buttonPressed].pressed = false;
-    sendTelegram("BTN", buttons[buttonPressed].instanceID, "STATUS", "0");
-  }
-}
+// *** ALTE FUNKTIONEN ENTFERNT ***
+// handleButtonWithServiceOption() - nicht mehr benötigt
+// drawServiceProgressBar() - nicht mehr benötigt  
+// handleNormalTouch() - nicht mehr benötigt
 
 void redrawUIElements() {
-  // Test-Button neu zeichnen
-  tft.fillRect(SCREEN_WIDTH - 60, 5, 55, 30, TFT_BLUE);
-  tft.setTextColor(TFT_WHITE);
-  tft.drawCentreString("TEST", SCREEN_WIDTH - 32, 15, 1);
+  // Test-Button neu zeichnen (falls vorhanden)
+  if (SCREEN_WIDTH > 240) { // Nur bei ausreichender Breite
+    tft.fillRect(SCREEN_WIDTH - 60, 5, 55, 30, TFT_BLUE);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("TEST", SCREEN_WIDTH - 32, 15, 1);
+  }
   
   // Helligkeit-Anzeige neu zeichnen
   tft.setTextColor(TFT_BLACK, TFT_WHITE);

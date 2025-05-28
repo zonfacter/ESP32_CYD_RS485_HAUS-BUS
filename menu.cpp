@@ -97,7 +97,7 @@ int checkButtonPress(int x, int y) {
 }
 
 // Initialisiert die Buttons mit ihren Positionen und Farben
-// Initialisiert die Buttons mit ihren Positionen und Farben
+// *** KORRIGIERTE initButtons() Funktion für menu.cpp ***
 void initButtons() {
   // *** DYNAMISCHE Button-Berechnung basierend auf aktueller TFT-Größe ***
   int currentWidth = tft.width();
@@ -113,8 +113,19 @@ void initButtons() {
     Serial.println(currentHeight);
   #endif
   
-  int headerOffset = HEADER_HEIGHT + 5;
-  int availableHeight = currentHeight - headerOffset;
+  // *** KORRIGIERTE Header-Offset Berechnung ***
+  int headerOffset = getHeaderOffset();  // Neue Funktion aus header_display.h
+  int availableHeight = getAvailableButtonHeight();  // Neue Funktion
+  int buttonAreaY = getButtonAreaY();  // Neue Funktion
+  
+  #if DB_INFO == 1
+    Serial.print("DEBUG: Header-Offset: ");
+    Serial.print(headerOffset);
+    Serial.print(", Button-Bereich Y: ");
+    Serial.print(buttonAreaY);
+    Serial.print(", Verfügbare Höhe: ");
+    Serial.println(availableHeight);
+  #endif
 
   // *** KORRIGIERTE Orientierungs-Erkennung ***
   if (rotation == 0 || rotation == 2) {
@@ -130,13 +141,10 @@ void initButtons() {
       int col = i % 2;
       int row = i / 2;
       int x = col * buttonWidth;
-      int y = headerOffset + row * buttonHeight;
+      int y = buttonAreaY + row * buttonHeight;  // *** KORRIGIERT: buttonAreaY verwenden ***
       
-      // *** KORRIGIERT: Spiegelung nur bei Rotation 2 (Portrait 180°) ***
-      if (rotation == 2) {
-        x = currentWidth - x - buttonWidth;
-        y = currentHeight - y - buttonHeight;
-      }
+      // *** ENTFERNT: Keine zusätzliche Spiegelung mehr ***
+      // Die TFT-Rotation macht das automatisch
       
       buttons[i].x = x;
       buttons[i].y = y;
@@ -161,12 +169,10 @@ void initButtons() {
       int col = i % 3;
       int row = i / 3;
       int x = col * buttonWidth;
-      int y = headerOffset + row * buttonHeight;
+      int y = buttonAreaY + row * buttonHeight;  // *** KORRIGIERT: buttonAreaY verwenden ***
       
-      // *** KORRIGIERT: Spiegelung nur bei Rotation 3 (Landscape 270° - USB rechts) ***
-      if (rotation == 3) {
-        x = currentWidth - x - buttonWidth;
-      }
+      // *** ENTFERNT: Keine zusätzliche Spiegelung mehr ***
+      // Die TFT-Rotation macht das automatisch
       
       buttons[i].x = x;
       buttons[i].y = y;
@@ -194,7 +200,8 @@ void initButtons() {
     Serial.println("=== Button-Layout nach initButtons() ===");
     Serial.printf("Screen: %dx%d, Rotation: %d\n", currentWidth, currentHeight, rotation);
     Serial.printf("Button-Größe: %dx%d\n", buttonWidth, buttonHeight);
-    Serial.printf("Header-Offset: %d, Verfügbare Höhe: %d\n", headerOffset, availableHeight);
+    Serial.printf("Header-Offset: %d, Button-Bereich Y: %d, Verfügbare Höhe: %d\n", 
+                  headerOffset, buttonAreaY, availableHeight);
     Serial.println("=========================================");
   #endif
 }
