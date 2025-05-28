@@ -2,7 +2,7 @@
  * default_web_files.h - Version 2.0
  * 
  * Standard Web-Interface Dateien für ESP32 Touch-Panel
- * Diese Dateien werden automatisch erstellt, falls sie nicht im LittleFS vorhanden sind
+ * Diese Dateien werden automatisch erstellt, falls sie nicht im SPIFFS vorhanden sind
  */
 
 #ifndef DEFAULT_WEB_FILES_H
@@ -283,7 +283,7 @@ const char* DEFAULT_INDEX_HTML = R"HTML(
     </div>
 
     <footer>
-        <p>ESP32 Touch Panel v2.0 | LittleFS Web-Interface | 
+        <p>ESP32 Touch Panel v2.0 | SPIFFS Web-Interface | 
            Letztes Update: <span id="lastUpdate">-</span>
         </p>
     </footer>
@@ -819,7 +819,7 @@ footer {
 const char* DEFAULT_SCRIPT_JS = R"JS(
 /**
  * ESP32 Touch Panel Web-Interface JavaScript
- * Version 2.0 - LittleFS Edition
+ * Version 2.0 - SPIFFS Edition
  */
 
 class TouchPanelAPI {

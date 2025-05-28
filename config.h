@@ -10,6 +10,64 @@
 #include <FS.h>
 using namespace fs;  // <- Damit 'FS' statt 'fs::FS' funktioniert
 
+/*
+TOUCH-MODI:
+0 = LEGACY_MODE      - Alter Code, keine Änderungen
+1 = NORMAL_MODE      - Wisch-Schutz + Auto-Reset (empfohlen)
+2 = AUTO_RESET_ONLY  - Nur Auto-Reset, kein Wisch-Schutz
+3 = SWIPE_ONLY       - Nur Wisch-Erkennung, kein Auto-Reset  
+4 = SWIPE_APP_MODE   - Alles deaktiviert für Wisch-Anwendungen
+5 = SENSITIVE_MODE   - Sehr empfindliche Wisch-Erkennung
+*/
+#define TOUCH_MODE 1    // ← NUR DIESE EINE ZEILE ÄNDERN!
+
+#if TOUCH_MODE == 0
+    // LEGACY_MODE - Originaler Code
+    #define ENABLE_SWIPE_DETECTION 0
+    #define AUTO_RESET_BUTTONS 0
+    #define SWIPE_TIMEOUT_MS 0
+    #define SWIPE_DISTANCE_THRESHOLD 0
+    
+#elif TOUCH_MODE == 1
+    // NORMAL_MODE - Empfohlen für normale Nutzung
+    #define ENABLE_SWIPE_DETECTION 1
+    #define AUTO_RESET_BUTTONS 1
+    #define SWIPE_TIMEOUT_MS 500
+    #define SWIPE_DISTANCE_THRESHOLD 30
+    
+#elif TOUCH_MODE == 2
+    // AUTO_RESET_ONLY - Nur Auto-Reset
+    #define ENABLE_SWIPE_DETECTION 0
+    #define AUTO_RESET_BUTTONS 1
+    #define SWIPE_TIMEOUT_MS 1000
+    #define SWIPE_DISTANCE_THRESHOLD 0
+    
+#elif TOUCH_MODE == 3
+    // SWIPE_ONLY - Nur Wisch-Erkennung
+    #define ENABLE_SWIPE_DETECTION 1
+    #define AUTO_RESET_BUTTONS 0
+    #define SWIPE_TIMEOUT_MS 0
+    #define SWIPE_DISTANCE_THRESHOLD 50
+    
+#elif TOUCH_MODE == 4
+    // SWIPE_APP_MODE - Für Wisch-Anwendungen
+    #define ENABLE_SWIPE_DETECTION 0
+    #define AUTO_RESET_BUTTONS 0
+    #define SWIPE_TIMEOUT_MS 0
+    #define SWIPE_DISTANCE_THRESHOLD 0
+    
+#elif TOUCH_MODE == 5
+    // SENSITIVE_MODE - Sehr empfindlich
+    #define ENABLE_SWIPE_DETECTION 1
+    #define AUTO_RESET_BUTTONS 1
+    #define SWIPE_TIMEOUT_MS 300
+    #define SWIPE_DISTANCE_THRESHOLD 15
+    
+#else
+    #error "TOUCH_MODE ungültig! Wähle 0-5"
+#endif
+
+
 // Debug-Einstellungen
 #define DB_TX_HEX 0      // Hex-Ausgabe für gesendete Telegramme
 #define DB_TX_INFO 0     // Allgemeine Informationen zum Senden

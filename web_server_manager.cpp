@@ -5,7 +5,6 @@
 
 // Globale WebServerManager Instanz
 WebServerManager webServerManager;
-
 WebServerManager::WebServerManager() : server(80), serverRunning(false) {}
 
 void WebServerManager::begin() {

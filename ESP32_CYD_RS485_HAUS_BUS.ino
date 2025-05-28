@@ -32,14 +32,28 @@ unsigned long lastBacklightStatusTime = 0;
 
 // *** NEU: Button-Timing Variablen ***
 struct ButtonTiming {
-  bool touchActive;
-  unsigned long touchStartTime;
-  bool status1Sent;
-  int activeButtonIndex;
+    bool touchActive;
+    unsigned long touchStartTime;
+    bool status1Sent;
+    int activeButtonIndex;
+    
+    #if ENABLE_SWIPE_DETECTION == 1
+    // Nur bei aktivierter Wisch-Erkennung
+    int startTouchX;
+    int startTouchY;
+    int lastTouchX;
+    int lastTouchY;
+    bool isSwipe;
+    unsigned long lastTouchTime;
+    #endif
 };
 
-ButtonTiming buttonTiming = {false, 0, false, -1};
-
+ButtonTiming buttonTiming = {
+    false, 0, false, -1
+    #if ENABLE_SWIPE_DETECTION == 1
+    , 0, 0, 0, 0, false, 0
+    #endif
+};
 // *** NEU: Externe Funktion aus communication.cpp ***
 extern void applyAllPendingLedStates();
 
@@ -50,7 +64,14 @@ const unsigned long BUTTON_MAX_TIMEOUT = 10000;   // 10 Sekunden maximale Druckz
 void setup() {
   Serial.begin(115200);
   delay(100);
-  
+
+    #if DB_INFO == 1
+      Serial.println("\nESP32 Touch-Panel - Touch-Modus System");
+      Serial.println("Firmware-Version: 1.60");
+      
+      // Touch-Modus Info anzeigen
+      printTouchModeInfo();
+  #endif
   #if DB_INFO == 1
     Serial.println("\nESP32 ST7789 Touch-Menü mit CSMA/CD + Header-Display - Start");
     Serial.println("Firmware-Version: 1.60");
@@ -202,46 +223,34 @@ void loop() {
   
   // Touch-Eingaben verarbeiten
   if (touchscreen.tirqTouched() && touchscreen.touched()) {
-    delay(50); // Entprellung
-    
-    int x, y;
-    getTouchPoint(&x, &y);
-    
-    #if DB_INFO == 1
-      Serial.print("DEBUG: Touch erkannt - X: ");
-      Serial.print(x);
-      Serial.print(", Y: ");
-      Serial.print(y);
-      Serial.print(" (Service-Mode: ");
-      Serial.print(serviceManager.isServiceMode() ? "JA" : "NEIN");
-      Serial.println(")");
-    #endif
-    
-    // Service-Manager Touch-Handling zuerst prüfen
-    if (serviceManager.isServiceMode()) {
-      handleServiceTouch(x, y, true);
-      return;  // Service-Modus hat Vorrang
-    }
-    
-    // Service-Icon Touch prüfen (nur im Hauptmenü)
-    if (checkServiceIconTouch(x, y)) {
-      #if DB_INFO == 1
-        Serial.println("DEBUG: Service-Icon berührt - aktiviere Service-Modus");
-      #endif
-      
-      // Service-Icon visuell als gedrückt anzeigen
-      drawServiceIcon(true);
-      delay(200);  // Kurzes visuelles Feedback
-      
-      // Service-Modus aktivieren
-      serviceManager.enterServiceMode();
-      return;
-    }
-    
-    // *** NEUE TIMING-BASIERTE BUTTON-VERARBEITUNG ***
-    handleButtonTouch(x, y);
-    
-  } else {
+        delay(50);
+        
+        int x, y;
+        getTouchPoint(&x, &y);
+        
+        Serial.print("DEBUG: Touch bei X=");
+        Serial.print(x);
+        Serial.print(", Y=");
+        Serial.println(y);
+        
+        // *** WICHTIG: Service-Manager ZUERST prüfen ***
+        if (serviceManager.isServiceMode()) {
+            handleServiceTouch(x, y, true);
+            return;  // Service-Modus hat absolute Priorität
+        }
+        
+        // *** NEU: Service-Icon Touch ZUERST prüfen (vor Buttons!) ***
+        if (checkServiceIconTouch(x, y)) {
+            Serial.println("DEBUG: Service-Icon berührt - aktiviere Service-Modus");
+            drawServiceIcon(true);
+            delay(200);
+            serviceManager.enterServiceMode();
+            return;  // ← WICHTIG: return verhindert Button-Verarbeitung
+        }
+        
+        // *** NUR DANN Button-Touch verarbeiten ***
+        handleButtonTouch(x, y);
+    } else {
     // *** Touch nicht aktiv - prüfe ob Button-Timing läuft ***
     if (buttonTiming.touchActive) {
       // Touch wurde losgelassen
@@ -264,36 +273,79 @@ void loop() {
 
 // *** NEUE FUNKTION: Timing-basierte Button-Touch-Verarbeitung ***
 void handleButtonTouch(int x, int y) {
-  int buttonPressed = checkButtonPress(x, y);
-  
-  if (buttonPressed >= 0) {
-    // Prüfen, ob es ein neuer Button-Touch ist
-    if (!buttonTiming.touchActive || buttonTiming.activeButtonIndex != buttonPressed) {
-      
-      #if DB_INFO == 1
-        Serial.print("DEBUG: Button ");
-        Serial.print(buttonPressed + 1);
-        Serial.print(" (");
-        Serial.print(buttons[buttonPressed].label);
-        Serial.print(" - ID: ");
-        Serial.print(buttons[buttonPressed].instanceID);
-        Serial.println(") berührt - starte Timing");
-      #endif
-      
-      // Neuer Button-Touch
-      buttonTiming.touchActive = true;
-      buttonTiming.touchStartTime = millis();
-      buttonTiming.status1Sent = false;
-      buttonTiming.activeButtonIndex = buttonPressed;
-      
-      // Button sofort visuell als aktiv anzeigen (grün)
-      setButtonActive(buttonPressed, true);
-      
-      #if DB_INFO == 1
-        Serial.println("DEBUG: Button visuell aktiviert, warte 50ms für STATUS.1");
-      #endif
+    #if TOUCH_MODE == 0
+        // LEGACY_MODE - Originaler Code
+        int buttonPressed = checkButtonPress(x, y);
+        if (buttonPressed >= 0) {
+            if (!buttonTiming.touchActive || buttonTiming.activeButtonIndex != buttonPressed) {
+                buttonTiming.touchActive = true;
+                buttonTiming.touchStartTime = millis();
+                buttonTiming.status1Sent = false;
+                buttonTiming.activeButtonIndex = buttonPressed;
+                setButtonActive(buttonPressed, true);
+            }
+        }
+        return;
+    #endif
+    
+    #if ENABLE_SWIPE_DETECTION == 1
+        // Wisch-Erkennung (Modi 1, 3, 5)
+        if (!buttonTiming.touchActive) {
+            buttonTiming.startTouchX = x;
+            buttonTiming.startTouchY = y;
+            buttonTiming.isSwipe = false;
+        } else {
+            int deltaX = abs(x - buttonTiming.startTouchX);
+            int deltaY = abs(y - buttonTiming.startTouchY);
+            
+            if (deltaX > SWIPE_DISTANCE_THRESHOLD || deltaY > SWIPE_DISTANCE_THRESHOLD) {
+                buttonTiming.isSwipe = true;
+                
+                #if DB_INFO == 1
+                    Serial.print("DEBUG: Wisch erkannt (Modus ");
+                    Serial.print(TOUCH_MODE);
+                    Serial.print(") - Delta X:");
+                    Serial.print(deltaX);
+                    Serial.print(", Y:");
+                    Serial.println(deltaY);
+                #endif
+                
+                if (buttonTiming.activeButtonIndex >= 0) {
+                    setButtonActive(buttonTiming.activeButtonIndex, false);
+                    resetButtonTiming();
+                }
+                return;
+            }
+        }
+        
+        buttonTiming.lastTouchX = x;
+        buttonTiming.lastTouchY = y;
+        buttonTiming.lastTouchTime = millis();
+        
+        if (buttonTiming.isSwipe) return;
+    #endif
+    
+    // Standard Button-Verarbeitung
+    int buttonPressed = checkButtonPress(x, y);
+    
+    if (buttonPressed >= 0) {
+        if (!buttonTiming.touchActive || buttonTiming.activeButtonIndex != buttonPressed) {
+            
+            #if DB_INFO == 1
+                Serial.print("DEBUG: Button ");
+                Serial.print(buttonPressed + 1);
+                Serial.print(" (Touch-Modus ");
+                Serial.print(TOUCH_MODE);
+                Serial.println(")");
+            #endif
+            
+            buttonTiming.touchActive = true;
+            buttonTiming.touchStartTime = millis();
+            buttonTiming.status1Sent = false;
+            buttonTiming.activeButtonIndex = buttonPressed;
+            setButtonActive(buttonPressed, true);
+        }
     }
-  }
 }
 
 // *** NEUE FUNKTION: Button-Release-Verarbeitung ***
@@ -492,3 +544,112 @@ void redrawUIElements() {
   tft.fillRect(10, SCREEN_HEIGHT - 25, 200, 20, TFT_WHITE);
   tft.drawString("Helligkeit: " + String(currentBacklight) + "%", 10, SCREEN_HEIGHT - 20, 1);
 }
+
+void printTouchModeInfo() {
+    Serial.println("\n=== TOUCH-MODUS KONFIGURATION ===");
+    
+    switch(TOUCH_MODE) {
+        case 0:
+            Serial.println("Modus 0: LEGACY_MODE");
+            Serial.println("- Originaler Code ohne Änderungen");
+            Serial.println("- Keine Wisch-Erkennung");
+            Serial.println("- Kein Auto-Reset");
+            break;
+            
+        case 1:
+            Serial.println("Modus 1: NORMAL_MODE (empfohlen)");
+            Serial.println("- Wisch-Erkennung: EIN (30px Schwelle)");
+            Serial.println("- Auto-Reset: EIN (500ms Timeout)");
+            Serial.println("- Verhindert 'hängende' grüne Buttons");
+            break;
+            
+        case 2:
+            Serial.println("Modus 2: AUTO_RESET_ONLY");
+            Serial.println("- Wisch-Erkennung: AUS");
+            Serial.println("- Auto-Reset: EIN (1000ms Timeout)");
+            Serial.println("- Nur Timeout-basiertes Reset");
+            break;
+            
+        case 3:
+            Serial.println("Modus 3: SWIPE_ONLY");
+            Serial.println("- Wisch-Erkennung: EIN (50px Schwelle)");
+            Serial.println("- Auto-Reset: AUS");
+            Serial.println("- Nur Wisch-Schutz, kein Timeout");
+            break;
+            
+        case 4:
+            Serial.println("Modus 4: SWIPE_APP_MODE");
+            Serial.println("- Wisch-Erkennung: AUS");
+            Serial.println("- Auto-Reset: AUS");
+            Serial.println("- Für Wisch-basierte Anwendungen");
+            break;
+            
+        case 5:
+            Serial.println("Modus 5: SENSITIVE_MODE");
+            Serial.println("- Wisch-Erkennung: EIN (15px Schwelle)");
+            Serial.println("- Auto-Reset: EIN (300ms Timeout)");
+            Serial.println("- Sehr empfindliche Erkennung");
+            break;
+    }
+    
+    Serial.println("Parameter:");
+    Serial.print("- ENABLE_SWIPE_DETECTION: ");
+    Serial.println(ENABLE_SWIPE_DETECTION);
+    Serial.print("- AUTO_RESET_BUTTONS: ");
+    Serial.println(AUTO_RESET_BUTTONS);
+    Serial.print("- SWIPE_TIMEOUT_MS: ");
+    Serial.println(SWIPE_TIMEOUT_MS);
+    Serial.print("- SWIPE_DISTANCE_THRESHOLD: ");
+    Serial.println(SWIPE_DISTANCE_THRESHOLD);
+    Serial.println("================================\n");
+}
+
+#if AUTO_RESET_BUTTONS == 1
+void checkAndResetStuckButtons() {
+    static unsigned long lastResetCheck = 0;
+    
+    if (millis() - lastResetCheck < 100) return;
+    lastResetCheck = millis();
+    
+    for (int i = 0; i < NUM_BUTTONS; i++) {
+        if (buttons[i].isActive && !buttons[i].pressed) {
+            
+            #if ENABLE_SWIPE_DETECTION == 1
+                // Modi mit Wisch-Erkennung (1, 3, 5)
+                if (buttonTiming.lastTouchTime > 0 && 
+                    (millis() - buttonTiming.lastTouchTime > SWIPE_TIMEOUT_MS)) {
+                    
+                    setButtonActive(i, false);
+                    
+                    #if DB_INFO == 1
+                        Serial.print("DEBUG: Auto-Reset Button ");
+                        Serial.print(i + 1);
+                        Serial.print(" (Modus ");
+                        Serial.print(TOUCH_MODE);
+                        Serial.println(")");
+                    #endif
+                }
+            #else
+                // Modi nur mit Auto-Reset (2)
+                static unsigned long buttonActivatedTime[NUM_BUTTONS] = {0};
+                
+                if (buttonActivatedTime[i] == 0) {
+                    buttonActivatedTime[i] = millis();
+                } else if (millis() - buttonActivatedTime[i] > SWIPE_TIMEOUT_MS) {
+                    setButtonActive(i, false);
+                    buttonActivatedTime[i] = 0;
+                    
+                    #if DB_INFO == 1
+                        Serial.print("DEBUG: Auto-Reset Button ");
+                        Serial.print(i + 1);
+                        Serial.print(" (Modus ");
+                        Serial.print(TOUCH_MODE);
+                        Serial.println(" - Timeout)");
+                    #endif
+                }
+            #endif
+        }
+    }
+}
+#endif
+
