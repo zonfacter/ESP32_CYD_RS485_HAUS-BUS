@@ -18,7 +18,7 @@
 #define SERVICE_ICON_SIZE 18
 
 #define SERVICE_TOUCH_AREA_WIDTH 60   
-#define SERVICE_TOUCH_AREA_HEIGHT 20  
+#define SERVICE_TOUCH_AREA_HEIGHT 30  
 
 // Header-Funktionen
 void setupHeaderDisplay();
