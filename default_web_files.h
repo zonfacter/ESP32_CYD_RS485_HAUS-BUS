@@ -1382,9 +1382,77 @@ class TouchPanelAPI {
         }
     }
 }
-
+class ConverterAPI {
+    constructor(baseURL) {
+        this.baseURL = baseURL;
+    }
+    
+    // Button-Konfiguration laden
+    async getButtons() {
+        const response = await fetch(`${this.baseURL}/api/converter/buttons`);
+        return await response.json();
+    }
+    
+    // Button-Konfiguration speichern
+    async saveButtons(buttonData) {
+        const response = await fetch(`${this.baseURL}/api/converter/buttons`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `buttonData=${encodeURIComponent(JSON.stringify(buttonData))}`
+        });
+        return await response.json();
+    }
+    
+    // Template anwenden
+    async applyTemplate(templateName) {
+        const response = await fetch(`${this.baseURL}/api/converter/template/apply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `templateName=${encodeURIComponent(templateName)}`
+        });
+        return await response.json();
+    }
+    
+    // Verfügbare Templates laden
+    async getTemplates() {
+        const response = await fetch(`${this.baseURL}/api/converter/templates`);
+        return await response.json();
+    }
+    
+    // System-Konfiguration laden
+    async getSystem() {
+        const response = await fetch(`${this.baseURL}/api/converter/system`);
+        return await response.json();
+    }
+    
+    // System-Konfiguration speichern
+    async saveSystem(systemData) {
+        const formData = new URLSearchParams();
+        Object.keys(systemData).forEach(key => {
+            formData.append(key, systemData[key]);
+        });
+        
+        const response = await fetch(`${this.baseURL}/api/converter/system`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData
+        });
+        return await response.json();
+    }
+    
+    // Factory Reset
+    async factoryReset() {
+        const response = await fetch(`${this.baseURL}/api/converter/factory-reset`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'confirm=RESET'
+        });
+        return await response.json();
+    }
+}
 // Globale API-Instanz
 const api = new TouchPanelAPI();
+const converterAPI = new ConverterAPI(window.location.origin);
 
 // Globale Funktionen für Event-Handler
 function sendTelegram() { api.sendTelegram(); }
@@ -1404,6 +1472,88 @@ function clearLogs() { api.clearLogs(); }
 function downloadLogs() { api.downloadLogs(); }
 function uploadFiles() { api.uploadFiles(); }
 function refreshFiles() { api.refreshFiles(); }
+// Erweiterte Button-Speicher-Funktion
+async function saveButtonConfigPersistent() {
+    try {
+        // Button-Daten sammeln
+        const buttonData = {
+            buttons: []
+        };
+        
+        for (let i = 0; i < 6; i++) {
+            buttonData.buttons.push({
+                id: i,
+                label: document.getElementById(`buttonLabel${i}`).value || `Taster ${i + 1}`,
+                instanceID: String(17 + i),
+                colorInactive: document.getElementById(`buttonColor${i}`).value || '#808080',
+                textColor: '#FFFFFF',
+                enabled: true,
+                priority: 5
+            });
+        }
+        
+        // Über Converter Service speichern
+        const result = await converterAPI.saveButtons(buttonData);
+        
+        if (result.success) {
+            showNotification('Button-Konfiguration persistent gespeichert!', 'success');
+            await updateButtonDisplay();
+        } else {
+            showNotification('Fehler: ' + result.message, 'error');
+        }
+    } catch (error) {
+        showNotification('Speichern fehlgeschlagen: ' + error.message, 'error');
+    }
+}
+
+// Template-Anwendung
+async function applyTemplateToButtons(templateName) {
+    try {
+        const result = await converterAPI.applyTemplate(templateName);
+        
+        if (result.success) {
+            showNotification(`Template '${templateName}' angewendet und gespeichert!`, 'success');
+            await updateButtonDisplay();
+            await loadButtonConfiguration();
+        } else {
+            showNotification('Template-Fehler: ' + result.message, 'error');
+        }
+    } catch (error) {
+        showNotification('Template-Anwendung fehlgeschlagen: ' + error.message, 'error');
+    }
+}
+
+// Button-Display aktualisieren
+async function updateButtonDisplay() {
+    try {
+        const buttonData = await converterAPI.getButtons();
+        // Button-Anzeige im Web-Interface aktualisieren
+        updateButtonUI(buttonData);
+    } catch (error) {
+        console.error('Button-Display Update fehlgeschlagen:', error);
+    }
+}
+
+// Factory Reset mit Converter Service
+async function performFactoryReset() {
+    if (confirm('ACHTUNG: Factory Reset löscht alle Konfigurationen!\nFortfahren?')) {
+        try {
+            const result = await converterAPI.factoryReset();
+            
+            if (result.success) {
+                showNotification('Factory Reset durchgeführt - System wird neu gestartet...', 'warning');
+                
+                setTimeout(() => {
+                    window.location.reload();
+                }, 5000);
+            } else {
+                showNotification('Factory Reset fehlgeschlagen: ' + result.message, 'error');
+            }
+        } catch (error) {
+            showNotification('Factory Reset Fehler: ' + error.message, 'error');
+        }
+    }
+}
 
 // Service Worker für Offline-Funktionalität (optional)
 if ('serviceWorker' in navigator) {

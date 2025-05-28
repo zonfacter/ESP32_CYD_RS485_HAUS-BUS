@@ -126,6 +126,51 @@ void WebServerManager::setupRoutes() {
         handleAPIFactoryReset(request);
     });
 
+    // *** NEU: Converter Service API-Routen ***
+    server.on("/api/buttons/save", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    String jsonData = request->getParam("buttonData", true)->value();
+    if (webConverter.setButtonsFromJSON(jsonData)) {
+        sendSuccess(request, "Gespeichert!");
+    }
+    });
+
+    server.on("/api/template/apply", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    String templateName = request->getParam("templateName", true)->value();
+    webConverter.applyTemplate(templateName);
+    sendSuccess(request, "Template angewendet!");
+    });    
+    // Button-Konfiguration über Converter Service
+    server.on("/api/converter/buttons", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        handleConverterGetButtons(request);
+    });
+    
+    server.on("/api/converter/buttons", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        handleConverterSaveButtons(request);
+    });
+    
+    // Template-System
+    server.on("/api/converter/templates", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        handleConverterGetTemplates(request);
+    });
+    
+    server.on("/api/converter/template/apply", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        handleConverterApplyTemplate(request);
+    });
+    
+    // System-Konfiguration über Converter Service
+    server.on("/api/converter/system", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        handleConverterGetSystem(request);
+    });
+    
+    server.on("/api/converter/system", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        handleConverterSaveSystem(request);
+    });
+    
+    // Factory Reset über Converter Service
+    server.on("/api/converter/factory-reset", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        handleConverterFactoryReset(request);
+    });
+
     // Button-Konfiguration Routen
     server.on("/config/buttons", HTTP_GET, [this](AsyncWebServerRequest *request) {
         handleGetButtonConfig(request);
@@ -1339,5 +1384,169 @@ void WebServerManager::updateButtonFromConfigurator(int buttonId, AsyncWebServer
     if (request->hasParam("buttonEnabled", true)) {
         String enabled = request->getParam("buttonEnabled", true)->value();
         buttons[buttonId].isActive = (enabled == "true" || enabled == "1" || enabled == "on");
+    }
+}
+
+// *** NEU: Converter Service Handler-Funktionen implementieren ***
+
+void WebServerManager::handleConverterGetButtons(AsyncWebServerRequest *request) {
+    Serial.println("📡 GET Button-Konfiguration über Converter Service");
+    
+    String jsonData = webConverter.getButtonsAsJSON();
+    request->send(200, "application/json", jsonData);
+    
+    Serial.println("✅ Button-Konfiguration gesendet");
+}
+
+void WebServerManager::handleConverterSaveButtons(AsyncWebServerRequest *request) {
+    Serial.println("📥 POST Button-Konfiguration über Converter Service");
+    
+    // Parameter prüfen
+    if (!request->hasParam("buttonData", true)) {
+        sendError(request, "Parameter 'buttonData' fehlt", 400);
+        return;
+    }
+    
+    String jsonData = request->getParam("buttonData", true)->value();
+    
+    #if DB_INFO == 1
+        Serial.println("📋 Empfangene Button-Daten:");
+        Serial.println(jsonData);
+    #endif
+    
+    // Über Converter Service verarbeiten
+    if (webConverter.setButtonsFromJSON(jsonData)) {
+        // Zusätzlich: SPIFFS Synchronisation für Web-Interface Kompatibilität
+        webConverter.saveAll();
+        
+        sendSuccess(request, "Button-Konfiguration erfolgreich gespeichert und persistent gemacht");
+        
+        Serial.println("✅ Button-Konfiguration über Converter Service gespeichert");
+    } else {
+        sendError(request, "Fehler beim Verarbeiten der Button-Konfiguration", 400);
+        Serial.println("❌ Fehler beim Speichern der Button-Konfiguration");
+    }
+}
+
+void WebServerManager::handleConverterApplyTemplate(AsyncWebServerRequest *request) {
+    Serial.println("📋 Template-Anwendung über Converter Service");
+    
+    if (!request->hasParam("templateName", true)) {
+        sendError(request, "Parameter 'templateName' fehlt", 400);
+        return;
+    }
+    
+    String templateName = request->getParam("templateName", true)->value();
+    
+    Serial.println("🎨 Wende Template an: " + templateName);
+    
+    if (webConverter.applyTemplate(templateName)) {
+        sendSuccess(request, "Template '" + templateName + "' erfolgreich angewendet und gespeichert");
+        Serial.println("✅ Template erfolgreich angewendet");
+    } else {
+        sendError(request, "Template '" + templateName + "' nicht gefunden", 404);
+        Serial.println("❌ Template nicht gefunden: " + templateName);
+    }
+}
+
+void WebServerManager::handleConverterGetTemplates(AsyncWebServerRequest *request) {
+    Serial.println("📋 GET verfügbare Templates");
+    
+    String templatesData = webConverter.getAvailableTemplates();
+    request->send(200, "application/json", templatesData);
+    
+    Serial.println("✅ Template-Liste gesendet");
+}
+
+void WebServerManager::handleConverterGetSystem(AsyncWebServerRequest *request) {
+    Serial.println("⚙️ GET System-Konfiguration über Converter Service");
+    
+    String systemData = webConverter.getSystemAsJSON();
+    request->send(200, "application/json", systemData);
+    
+    Serial.println("✅ System-Konfiguration gesendet");
+}
+
+void WebServerManager::handleConverterSaveSystem(AsyncWebServerRequest *request) {
+    Serial.println("⚙️ POST System-Konfiguration über Converter Service");
+    
+    bool hasChanges = false;
+    
+    // Device ID
+    if (request->hasParam("deviceID", true)) {
+        String newDeviceID = request->getParam("deviceID", true)->value();
+        if (newDeviceID.length() == 4) {
+            serviceManager.setDeviceID(newDeviceID);
+            hasChanges = true;
+            Serial.println("📝 Device ID geändert: " + newDeviceID);
+        }
+    }
+    
+    // Orientierung
+    if (request->hasParam("orientation", true)) {
+        int orientation = request->getParam("orientation", true)->value().toInt();
+        if (orientation == 0 || orientation == 1) {
+            serviceManager.setOrientation(orientation);
+            hasChanges = true;
+            Serial.println("📝 Orientierung geändert: " + String(orientation));
+        }
+    }
+    
+    // Helligkeit
+    if (request->hasParam("brightness", true)) {
+        int brightness = request->getParam("brightness", true)->value().toInt();
+        brightness = constrain(brightness, 0, 100);
+        setBacklight(brightness);
+        hasChanges = true;
+        Serial.println("📝 Helligkeit geändert: " + String(brightness) + "%");
+    }
+    
+    if (hasChanges) {
+        // Über Converter Service speichern
+        webConverter.syncSystemFromServiceManager();
+        webConverter.saveAll();
+        
+        sendSuccess(request, "System-Konfiguration erfolgreich gespeichert");
+        Serial.println("✅ System-Konfiguration gespeichert");
+    } else {
+        sendError(request, "Keine gültigen Parameter empfangen", 400);
+    }
+}
+
+void WebServerManager::handleConverterFactoryReset(AsyncWebServerRequest *request) {
+    Serial.println("🏭 Factory Reset über Converter Service");
+    
+    // Sicherheitsabfrage
+    if (request->hasParam("confirm", true)) {
+        String confirm = request->getParam("confirm", true)->value();
+        
+        if (confirm == "RESET") {
+            Serial.println("⚠️ Factory Reset bestätigt - setze auf Werkseinstellungen zurück");
+            
+            // Standard-Template anwenden
+            webConverter.applyTemplate("wohnzimmer");
+            
+            // System-Defaults
+            serviceManager.setDeviceID("5999");
+            serviceManager.setOrientation(0);
+            setBacklight(100);
+            
+            // Speichern
+            webConverter.saveAll();
+            serviceManager.saveConfig();
+            
+            sendSuccess(request, "Factory Reset durchgeführt - System auf Werkseinstellungen zurückgesetzt");
+            
+            Serial.println("✅ Factory Reset abgeschlossen");
+            
+            // Restart nach 3 Sekunden
+            delay(3000);
+            ESP.restart();
+            
+        } else {
+            sendError(request, "Factory Reset nicht bestätigt (Bestätigung muss 'RESET' sein)", 400);
+        }
+    } else {
+        sendError(request, "Parameter 'confirm' mit Wert 'RESET' erforderlich", 400);
     }
 }

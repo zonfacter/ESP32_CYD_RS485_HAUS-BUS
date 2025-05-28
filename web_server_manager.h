@@ -10,6 +10,7 @@
 #include "backlight.h"
 #include "menu.h"
 #include <ESPAsyncWebServer.h>
+#include "converter_web_service.h"  // *** NEU ***
 
 using namespace fs;
 
@@ -64,6 +65,14 @@ public:
     void handleAPIGetDate(AsyncWebServerRequest *request);
     void handleAPISetDate(AsyncWebServerRequest *request);
     void handleAPISetDateTime(AsyncWebServerRequest *request);
+    // *** NEU: Converter Service Integration ***
+    void handleConverterGetButtons(AsyncWebServerRequest *request);
+    void handleConverterSaveButtons(AsyncWebServerRequest *request);
+    void handleConverterApplyTemplate(AsyncWebServerRequest *request);
+    void handleConverterGetTemplates(AsyncWebServerRequest *request);
+    void handleConverterGetSystem(AsyncWebServerRequest *request);
+    void handleConverterSaveSystem(AsyncWebServerRequest *request);
+    void handleConverterFactoryReset(AsyncWebServerRequest *request);
 
 private:
     AsyncWebServer server;

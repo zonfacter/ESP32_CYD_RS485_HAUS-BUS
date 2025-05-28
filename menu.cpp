@@ -214,8 +214,15 @@ void showMenu() {
   // *** Header zeichnen ***
   drawHeader();
   
-  // *** Initialisiere Buttons für aktuelle Orientierung ***
-  initButtons();
+// *** GEÄNDERT: Buttons aus Converter Service laden ***
+  // Statt initButtons() direkt aufzurufen, erst prüfen ob gespeicherte Config existiert
+  if (!webConverter.loadButtons()) {
+    // Keine gespeicherte Konfiguration - normale Initialisierung
+    initButtons();
+  } else {
+    // Gespeicherte Konfiguration anwenden
+    webConverter.applyButtonsToDisplay();
+  }
   
   // Zeichne Buttons
   drawButtons();

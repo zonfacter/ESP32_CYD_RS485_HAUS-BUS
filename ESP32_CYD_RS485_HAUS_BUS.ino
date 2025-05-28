@@ -22,6 +22,8 @@
 // *** NEU: Display-Kalibrierung (nur für Inbetriebnahme) ***
 #include "display_calibration.h"
 
+#include "converter_web_service.h"  // *** NEU ***
+
 // *** NUR DAS TFT-OBJEKT DEFINIEREN ***
 TFT_eSPI tft = TFT_eSPI();
 
@@ -83,6 +85,36 @@ void setup() {
   // *** NEU: Header-Display initialisieren ***
   setupHeaderDisplay();
   
+// *** NEU: Converter Web Service initialisieren ***
+  Serial.println("🔄 Initialisiere Converter Web Service...");
+  if (!webConverter.begin()) {
+    Serial.println("❌ Converter Web Service konnte nicht initialisiert werden!");
+  } else {
+    Serial.println("✅ Converter Web Service erfolgreich initialisiert");
+    
+    // Callback für Konfigurationsänderungen setzen
+    webConverter.setConfigChangedCallback([](String configType) {
+      Serial.println("📡 Konfiguration geändert: " + configType);
+      
+      if (configType == "buttons") {
+        Serial.println("🔄 Aktualisiere Button-Display...");
+        drawButtons();
+      } else if (configType == "system") {
+        Serial.println("🔄 Aktualisiere System-Konfiguration...");
+        // Header neu zeichnen falls Device ID geändert
+        if (!serviceManager.isServiceMode()) {
+          drawHeader();
+        }
+      }
+    });
+    
+    // Gespeicherte Konfiguration laden und anwenden
+    Serial.println("📥 Lade gespeicherte Button-Konfiguration...");
+    // webConverter.loadAll() wird bereits in begin() aufgerufen
+    webConverter.begin();
+    webConverter.printStatus();
+  }
+
   // *** NEU: Gespeicherte Orientierung anwenden ***
   if (serviceManager.getOrientation() != SCREEN_ORIENTATION) {
     Serial.println("DEBUG: Wende gespeicherte Orientierung an");

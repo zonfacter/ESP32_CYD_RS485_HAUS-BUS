@@ -1,4 +1,4 @@
-// config.h - Korrigierte Konfiguration (Version 1.50 Stable)
+// config.h - KORRIGIERTE VERSION
 #ifndef CONFIG_H
 #define CONFIG_H
 
@@ -125,7 +125,7 @@ extern bool invertTouchY;
 // Timing für Status-Updates
 #define BACKLIGHT_STATUS_INTERVAL 23000  // Intervall für Backlight-Status
 
-// Button-Konfiguration
+// *** WICHTIG: NUM_BUTTONS FRÜH DEFINIEREN ***
 #define NUM_BUTTONS 6           // Anzahl der Bildschirmtaster
 
 // Button-Datenstruktur
@@ -164,5 +164,8 @@ extern unsigned long totalSent;
 extern unsigned long totalCollisions;
 extern unsigned long totalRetries;
 extern unsigned long totalDropped;  // Verworfene Telegramme
+
+// *** CONVERTER WEB SERVICE INCLUDE - JETZT NACH NUM_BUTTONS ***
+#include "converter_web_service.h"
 
 #endif // CONFIG_H
