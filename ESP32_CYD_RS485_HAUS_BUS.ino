@@ -132,7 +132,6 @@ void setup() {
     // Gespeicherte Konfiguration laden und anwenden
     Serial.println("📥 Lade gespeicherte Button-Konfiguration...");
     // webConverter.loadAll() wird bereits in begin() aufgerufen
-    webConverter.begin();
     webConverter.printStatus();
   }
 
@@ -652,4 +651,3 @@ void checkAndResetStuckButtons() {
     }
 }
 #endif
-

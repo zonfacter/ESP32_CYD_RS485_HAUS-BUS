@@ -417,6 +417,15 @@ void sendTelegram(String function, String instanceID, String action, String para
   }
   
   telegram += String((char)END_BYTE);
+
+  if (telegram.length() >= MAX_TELEGRAM_LENGTH) {
+    #if DB_TX_INFO == 1
+      Serial.print("DEBUG: Telegramm zu lang, verworfen (Länge ");
+      Serial.print(telegram.length());
+      Serial.println(")");
+    #endif
+    return;
+  }
   
   #if DB_TX_INFO == 1
     Serial.print("DEBUG: Sende Telegramm mit Device ID ");
