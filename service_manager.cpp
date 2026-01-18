@@ -36,7 +36,7 @@ ServiceManager::ServiceManager() {
   lastProgressUpdate = 0;
   progressPercent = 0;
   currentDeviceID = DEVICE_ID;  // Aus config.h
-  currentOrientation = SCREEN_ORIENTATION;  // Aus config.h
+  currentOrientation = (SCREEN_ORIENTATION == ROTATION_0 || SCREEN_ORIENTATION == ROTATION_180) ? PORTRAIT : LANDSCAPE;  // Aus config.h
   configChanged = false;
   editDeviceID = "";
   editPosition = 0;
@@ -642,10 +642,14 @@ void ServiceManager::toggleOrientation() {
 }
 
 void ServiceManager::applyOrientation(int rotation) {
-  rotation %= 4;
-  tft.setRotation(rotation);
-  currentOrientation = rotation;
-  configManager.device.orientation = rotation;
+  if (rotation == PORTRAIT) {
+    tft.setRotation(ROTATION_0);
+    currentOrientation = PORTRAIT;
+  } else {
+    tft.setRotation(ROTATION_270);
+    currentOrientation = LANDSCAPE;
+  }
+  configManager.device.orientation = currentOrientation;
   configChanged = true;
 
   initButtons();
@@ -949,6 +953,9 @@ void ServiceManager::loadConfig() {
     if (checksum == config.checksum) {
       currentDeviceID = String(config.deviceID);
       currentOrientation = config.orientation;
+      if (currentOrientation != PORTRAIT && currentOrientation != LANDSCAPE) {
+        currentOrientation = (SCREEN_ORIENTATION == ROTATION_0 || SCREEN_ORIENTATION == ROTATION_180) ? PORTRAIT : LANDSCAPE;
+      }
       
       #if DB_INFO == 1
         Serial.print("DEBUG: Konfiguration geladen - Device ID: ");
